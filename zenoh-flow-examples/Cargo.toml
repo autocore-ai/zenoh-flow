@@ -64,6 +64,22 @@ name = "manual-source"
 crate-type = ["cdylib"]
 
 [[example]]
+name = "manual-twonum"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "example-add"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "example-mul"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "generic-disp"
+crate-type = ["cdylib"]
+
+[[example]]
 name = "sum-and-send"
 crate-type = ["cdylib"]
 

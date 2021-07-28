@@ -1,0 +1,59 @@
+flow: FizzBuzz
+
+operators:
+  - id: AddOperator
+    uri: file://./target/debug/examples/libexample_add.so
+    inputs: [Str]
+    outputs: [Double0, Double1, Double2]
+
+  - id: MulOperator
+    uri: file://./target/debug/examples/libexample_mul.so
+    inputs: [Double0, Double1, Double2]
+    outputs: [Str]
+
+sources:
+  - id: ManualSenderOperator
+    uri: file://./target/debug/examples/libmanual_twonum.so
+    output: Str
+
+sinks:
+  - id: GenericDisp
+    uri: file://./target/debug/examples/libgeneric_disp.so
+    input: Str
+
+links:
+  - from:
+      id: ManualSenderOperator
+      output: Str
+    to:
+      id: AddOperator
+      input: Str
+
+  - from:
+      id: AddOperator
+      output: Double0
+    to:
+      id: MulOperator
+      input: Double0
+
+  - from:
+      id: AddOperator
+      output: Double1
+    to:
+      id: MulOperator
+      input: Double1
+
+  - from:
+      id: AddOperator
+      output: Double2
+    to:
+      id: MulOperator
+      input: Double2
+
+
+  - from:
+      id: MulOperator
+      output: Str
+    to:
+      id: GenericDisp
+      input: Str
