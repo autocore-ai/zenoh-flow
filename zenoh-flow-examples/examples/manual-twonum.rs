@@ -19,15 +19,52 @@ use zenoh_flow::{
     types::{
         DataTrait, FnOutputRule, FnSourceRun, FutRunResult, RunResult, SourceTrait, StateTrait,
     },
-    zf_data, zf_empty_state, ZFContext, ZFError, ZFLinkId, ZFResult,
+    zf_data, zf_empty_state, ZFContext, ZFError, ZFLinkId, ZFResult,downcast,serde::{Deserialize, Serialize},zenoh_flow_derive::ZFState,
 };
 use zenoh_flow_examples::ZFString;
 
-struct ManualSource;
+struct ManualSource{
+    pub state: ExtraNumState,
+}
+
+#[derive(Serialize, Deserialize, ZFState, Clone)]
+struct ExtraNumState {
+    pub extra_num1: f64,
+    pub extra_num2: f64,
+}
+
+
+impl std::fmt::Debug for ExtraNumState {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "ExtraNumState: extra_num1:{:?} extra_num2:{:?}",
+            self.extra_num1, self.extra_num2
+        )
+    }
+}
 
 static LINK_ID_INPUT_STR: &str = "Str";
 
 impl ManualSource {
+    fn init(configuration: HashMap<String, String>) -> ZFResult<Self> {
+        let extra_num1: f64 = match configuration.get("extra-num1") {
+            Some(num1) => num1.trim().parse().unwrap(),
+            None => 0.0,
+        };
+
+        let extra_num2: f64 = match configuration.get("extra-num2") {
+            Some(num2) => num2.trim().parse().unwrap(),
+            None => 0.0,
+        };
+
+        let state = ExtraNumState{
+            extra_num1,
+            extra_num2,
+        };
+        Ok(Self {state})
+    }
+
     async fn run(_ctx: ZFContext) -> RunResult {
         let mut results: HashMap<ZFLinkId, Arc<dyn DataTrait>> = HashMap::with_capacity(2);
 
@@ -45,6 +82,14 @@ impl ManualSource {
             2 => println!("received numbers are: {}, {}", v[0], v[1]),
             _ => panic!("could not read two numbers."),
         }
+
+        let guard = _ctx.lock();
+        let _state = downcast!(ExtraNumState, guard.state).unwrap(); //downcasting to right type
+
+        let _extra_num1 = _state.extra_num1;
+        let _extra_num2 = _state.extra_num2;
+
+        println!("extra config numbers are: {}, {}", _extra_num1, _extra_num2);
         
         let value0: f64 = match v[0].trim().parse() {
             Ok(value0) => value0,
@@ -55,15 +100,17 @@ impl ManualSource {
             Ok(value1) => value1,
             Err(_) => return Err(ZFError::GenericError),
         };
-        
-        results.insert(String::from(LINK_ID_INPUT_STR), zf_data!(ZFString(numbers)));
+
+        let new_numbers = format!("{} {}", value0 + _extra_num1, value1 + _extra_num2);
+
+        results.insert(String::from(LINK_ID_INPUT_STR), zf_data!(ZFString(new_numbers)));
 
         Ok(results)
     }
 }
 
 impl SourceTrait for ManualSource {
-    fn get_run(&self, ctx: ZFContext) -> FnSourceRun {
+    fn get_run(&self, _ctx: ZFContext) -> FnSourceRun {
         Box::new(|ctx: ZFContext| -> FutRunResult { Box::pin(Self::run(ctx)) })
     }
 
@@ -72,7 +119,7 @@ impl SourceTrait for ManualSource {
     }
 
     fn get_state(&self) -> Box<dyn StateTrait> {
-        zf_empty_state!()
+        Box::new(self.state.clone())
     }
 }
 
@@ -81,5 +128,11 @@ zenoh_flow::export_source!(register);
 extern "C" fn register(
     configuration: Option<HashMap<String, String>>,
 ) -> ZFResult<Box<dyn zenoh_flow::SourceTrait + Send>> {
-    Ok(Box::new(ManualSource {}) as Box<dyn zenoh_flow::SourceTrait + Send>)
+    match configuration {
+        Some(config) => {
+            Ok(Box::new(ManualSource::init(config)?) as Box<dyn zenoh_flow::SourceTrait + Send>)
+        }
+        None => Ok(Box::new(ManualSource::init(HashMap::new())?)
+            as Box<dyn zenoh_flow::SourceTrait + Send>),
+    }
 }
