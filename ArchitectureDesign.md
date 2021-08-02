@@ -1,6 +1,6 @@
 # Eclipse Zenoh-Flow Architecture
 
-## graph file
+## graph
 
 ### flow
 
@@ -31,4 +31,43 @@ id: operator/source/sink/connector的id
 runtime: 运行时名称
 
 ## 流程图
+
 ![avatar](./images/flow.png)
+
+
+## 关于DataFlowGraph
+
+![avatar](./images/dataflowgraph.png)
+
+## 关于DataFlowRecord
+
+![avatar](./images/dataflowrecord.png)
+
+## 关于 Runner
+
+### runner类型
+
+![avatar](./images/runner.png)
+
+### runner运行过程（待补充）
+
+
+
+## 上下文如何实例化
+
+![avatar](./images/zfcontext.png)
+
+在ZFOperatorRunner/ZFSourceRunner/ZFSinkRunner的run方法中对ZFContext实例化
+```
+let ctx = ZFContext::new(self.operator.get_state(), 0);
+```
+
+实例化的上下文被传递给source/operator/sink的get_input_rule/get_run/get_output_rule中，以便运行时使用
+
+### 上下文可用来做什么（待补充）
+
+## 数据类型（待补充）
+
+## Token（待补充）
+
+## 创建graph不仅仅可以是yaml，也可以为json，或者代码直接实现各个operators（待补充）
