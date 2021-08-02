@@ -43,14 +43,19 @@ runtime: 运行时名称
 
 ![avatar](./images/dataflowrecord.png)
 
+## 关于加载库函数
+
+![avatar](./images/load.png)
+
 ## 关于 Runner
 
 ### runner类型
 
 ![avatar](./images/runner.png)
 
-### runner运行过程（待补充）
+### runner运行过程
 
+![avatar](./images/runner_2.png)
 
 
 ## 上下文如何实例化
@@ -64,10 +69,28 @@ let ctx = ZFContext::new(self.operator.get_state(), 0);
 
 实例化的上下文被传递给source/operator/sink的get_input_rule/get_run/get_output_rule中，以便运行时使用
 
-### 上下文可用来做什么（待补充）
+## 数据类型
 
-## 数据类型（待补充）
+TokenData/ZFMessage和ZFData这三种数据类型是一样的结构，只是用在不同的数据处理过程
 
-## Token（待补充）
+1. TokenData 是在Token中使用，通过将ZFMessage转为TokenData，在operator中的input_rule中使用
 
-## 创建graph不仅仅可以是yaml，也可以为json，或者代码直接实现各个operators（待补充）
+2. ZFData operator的输入函数的输出数据转为ZFData，并将其传入到operator.run
+
+3. ZFMessage operator的输出函数的返回数据，转为ZFMessage，在sender和receiver中传输
+
+
+### Token
+
+![avatar](./images/Token.png)
+
+### ZFMessage
+
+![avatar](./images/ZFMessage.png)
+
+### ZFData
+
+![avatar](./images/ZFData.png)
+
+
+## 创建graph不仅仅可以是yaml，也可以为json，或者代码直接实现各个operators
