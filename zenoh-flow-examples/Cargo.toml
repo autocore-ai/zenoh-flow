@@ -19,6 +19,12 @@ zenoh-flow = { path = "../zenoh-flow" }
 env_logger = "0.9"
 serde = { version = "1.0.55", features = ["derive"] }
 opencv = "0.53.0"
+
+lazy_static = "1.4.0"
+mut_static = "5.0.0"
+regex = "1"
+
+reqwest = { version = "0.11", features = ["blocking", "json"] }
 async-std = { version = "=1.9.0", features = ["attributes"] }
 typetag = "0.1"
 log = "0.4"
@@ -105,3 +111,14 @@ name = "example-select"
 [[example]]
 name = "video-pipeline"
 
+[[example]]
+name = "lanelet2-map-input"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "lanelet2-map-operator"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "lanelet2-map-output"
+crate-type = ["cdylib"]
