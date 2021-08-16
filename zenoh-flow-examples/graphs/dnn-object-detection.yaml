@@ -2,16 +2,22 @@ flow: DNNPipeline # it should have a id, from this we will have an Instance of t
 operators:
   - id : ObjectDetection # this should be unique in the graph
     uri: file://./target/release/examples/libobject_detection_dnn.so
-    inputs: [Frame]
-    outputs: [Frame] #port id = String
+    inputs:
+      - id: Frame
+        type: image
+    outputs:
+      - id: Frame
+        type: image
     configuration:
-      neural-network: /home/gabri/Workspace/experiments/yolov3-face.cfg
-      network-weights: /home/gabri/Workspace/experiments/yolov3-wider_16000.weights
-      network-classes: /home/gabri/Workspace/experiments/face_classes.txt
+      neural-network: /home/luca/Workspace/experiments/yolov3-face.cfg
+      network-weights: /home/luca/Workspace/experiments/yolov3-wider_16000.weights
+      network-classes: /home/luca/Workspace/experiments/face_classes.txt
 sources: # sources can have only ONE output
   - id : Camera0
     uri: file://./target/release/examples/libcamera_source.so
-    output: Frame
+    output:
+      id: Frame
+      type: image
     configuration:
       camera: /dev/video0
       resolution: 800x600
@@ -19,17 +25,12 @@ sources: # sources can have only ONE output
 sinks: # sources can have only ONE input
   - id : Window
     uri: file://./target/release/examples/libvideo_sink.so
-    input: Frame
+    input:
+      id: Frame
+      type: image
+
 links:
-- from:
-    id : Camera0
-    output : Frame # Output
-  to:
-    id : ObjectDetection
-    input : Frame # Input
-- from:
-    id : ObjectDetection
-    output : Frame
-  to:
-    id : Window
-    input : Frame
+- from: Camera0.Frame
+  to: ObjectDetection.Frame
+- from: ObjectDetection.Frame
+  to: Window.Frame

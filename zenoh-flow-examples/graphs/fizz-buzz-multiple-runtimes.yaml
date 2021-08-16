@@ -3,60 +3,125 @@ flow: FizzBuzz
 operators:
   - id: FizzOperator
     uri: file://./target/debug/examples/libexample_fizz.dylib
-    inputs: [Int]
-    outputs: [Int, Str]
+    inputs:
+      - id: Int
+        type: u64
+    outputs:
+      - id: Int
+        type: u64
+      - id: Str
+        type: string
 
   - id: BuzzOperator
     uri: file://./target/debug/examples/libexample_buzz.dylib
-    inputs: [Int, Str]
-    outputs: [Str]
+    inputs:
+      - id: Int
+        type: u64
+      - id: Str
+        type: string
+    outputs:
+      - id: Str
+        type: string
+
+  - id: BuzzOperator2
+    uri: file://./target/debug/examples/libexample_buzz2.dylib
+    inputs:
+      - id: Int
+        type: u64
+      - id: Str
+        type: string
+    outputs:
+      - id: Str
+        type: string
+
+  - id: BuzzOperator3
+    uri: file://./target/debug/examples/libexample_buzz3.dylib
+    inputs:
+      - id: Int
+        type: u64
+      - id: Str
+        type: string
+    outputs:
+      - id: Str
+        type: string
 
 sources:
   - id: ManualSenderOperator
     uri: file://./target/debug/examples/libmanual_source.dylib
-    output: Int
+    period:
+      duration: 500
+      unit: ms
+    output:
+      id: Int
+      type: u64
 
 sinks:
   - id: ReceiverOperator
     uri: file://./target/debug/examples/libgeneric_sink.dylib
-    input: Str
+    input:
+      id: Str
+      type: string
+
+  - id: ReceiverOperator2
+    uri: file://./target/debug/examples/libgeneric_sink.dylib
+    input:
+      id: Str
+      type: string
+
+  - id: ReceiverOperator3
+    uri: file://./target/debug/examples/libgeneric_sink.dylib
+    input:
+      id: Str
+      type: string
 
 links:
-  - from:
-      id: ManualSenderOperator
-      output: Int
-    to:
-      id: FizzOperator
-      input: Int
+  - from: ManualSenderOperator.Int
+    to: FizzOperator.Int
 
-  - from:
-      id: FizzOperator
-      output: Int
-    to:
-      id: BuzzOperator
-      input: Int
+  # FizzOperator -> BuzzOperator -> ReceiverOperator
+  - from: FizzOperator.Int
+    to: BuzzOperator.Int
 
-  - from:
-      id: FizzOperator
-      output: Str
-    to:
-      id: BuzzOperator
-      input: Str
+  - from: FizzOperator.Str
+    to: BuzzOperator.Str
 
-  - from:
-      id: BuzzOperator
-      output: Str
-    to:
-      id: ReceiverOperator
-      input: Str
+  - from: BuzzOperator.Str
+    to: ReceiverOperator.Str
 
+  # FizzOperator -> BuzzOperator2 -> ReceiverOperator2
+  - from: FizzOperator.Int
+    to: BuzzOperator2.Int
+
+  - from: FizzOperator.Str
+    to: BuzzOperator2.Str
+
+  - from: BuzzOperator2.Str
+    to: ReceiverOperator2.Str
+
+  # FizzOperator -> BuzzOperator3 -> ReceiverOperator3
+  - from: FizzOperator.Int
+    to: BuzzOperator3.Int
+
+  - from: FizzOperator.Str
+    to: BuzzOperator3.Str
+
+  - from: BuzzOperator3.Str
+    to: ReceiverOperator3.Str
 
 mapping:
+  - id: ManualSenderOperator
+    runtime: foo
   - id: FizzOperator
     runtime: foo
   - id: BuzzOperator
     runtime: bar
-  - id: ManualSenderOperator
-    runtime: foo
   - id: ReceiverOperator
     runtime: bar
+  - id: BuzzOperator2
+    runtime: baz
+  - id: ReceiverOperator2
+    runtime: baz
+  - id: BuzzOperator3
+    runtime: foo
+  - id: ReceiverOperator3
+    runtime: foo

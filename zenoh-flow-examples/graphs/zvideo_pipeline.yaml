@@ -3,15 +3,15 @@ operators: []
 sources:
   - id : Camera
     uri: file://./target/debug/examples/libcamera_source.dylib
-    output: Frame
+    output:
+      id: Frame
+      type: image
 sinks:
   - id : ZSink
     uri: file://./target/debug/examples/libzenoh_sink.dylib
-    input: Frame
+    input:
+      id: Data
+      type: image
 links:
-- from:
-    id : Camera
-    output : Frame
-  to:
-    id : ZSink
-    input : Frame
+- from: Camera.Frame
+  to: ZSink.Data
