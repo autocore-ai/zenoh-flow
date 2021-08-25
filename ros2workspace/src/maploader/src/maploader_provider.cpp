@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "common/types.hpp"
 #include "had_map_utils/had_map_utils.hpp"
+#include <common/types.hpp>
 
 #include "GeographicLib/Geocentric.hpp"
 #include "lanelet2_core/primitives/GPSPoint.h"

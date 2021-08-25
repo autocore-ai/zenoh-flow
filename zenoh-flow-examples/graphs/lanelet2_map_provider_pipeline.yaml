@@ -3,13 +3,19 @@ flow: Lanelet2MapProvider
 operators:
   - id: Lanelet2MapOperator
     uri: file://./target/debug/examples/liblanelet2_map_operator.so
-    inputs: [Config]
-    outputs: [Config]
+    inputs:
+      - id: Str
+        type: string
+    outputs:
+      - id: Str
+        type: string
 
 sources:
   - id: Lanelet2MapInput
     uri: file://./target/debug/examples/liblanelet2_map_input.so
-    output: Config
+    output: 
+      id: Str
+      type: string
     configuration:
       map_osm_file: http://192.168.10.43:8000/sdv/2/map/lanelet2_map.osm
       latitude: 37.380811523812845
@@ -19,19 +25,13 @@ sources:
 sinks:
   - id: Lanelet2MapOutput
     uri: file://./target/debug/examples/liblanelet2_map_output.so
-    input: Config
+    input:
+      id: Str
+      type: string
 
 links:
-  - from:
-      id: Lanelet2MapInput
-      output: Config
-    to:
-      id: Lanelet2MapOperator
-      input: Config
+  - from: Lanelet2MapInput.Str
+    to: Lanelet2MapOperator.Str
 
-  - from:
-      id: Lanelet2MapOperator
-      output: Config
-    to:
-      id: Lanelet2MapOutput
-      input: Config
+  - from: Lanelet2MapOperator.Str
+    to: Lanelet2MapOutput.Str

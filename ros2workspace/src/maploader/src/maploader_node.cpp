@@ -9,29 +9,36 @@
 #include <geometry_msgs/msg/transform_stamped.h>
 
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/node_options.hpp>
 #include <rclcpp/time_source.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
+
 #include <common/types.hpp>
 #include <chrono>
 #include <string>
 #include <memory>
 #include <utility>
 
-#include "autoware_auto_msgs/srv/had_map_service.hpp"
-#include "autoware_auto_msgs/msg/had_map_bin.hpp"
 #include "had_map_utils/had_map_conversion.hpp"
 #include "had_map_utils/had_map_query.hpp"
 
 #include <unistd.h>
 
+#include <boost/interprocess/managed_shared_memory.hpp> 
+
+#include "had_map_utils/had_map_utils.hpp"
+#include "GeographicLib/Geocentric.hpp"
+#include "lanelet2_core/primitives/GPSPoint.h"
+#include "lanelet2_io/Io.h"
+#include "lanelet2_projection/UTM.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+
 using autoware::common::types::bool8_t;
 
-
-void start_service(const char* map_osm_file_ptr, const float64_t origin_offset_lat, 
+void *start_service(const char* map_osm_file_ptr, const float64_t origin_offset_lat, 
     const float64_t origin_offset_lon, const float64_t latitude, const float64_t longitude, const float64_t elevation) {
     rclcpp::init(0, nullptr);
     rclcpp::NodeOptions options;
-    rclcpp::executors::MultiThreadedExecutor executor;
 
     std::string map_osm_file(map_osm_file_ptr);
 
@@ -54,16 +61,29 @@ void start_service(const char* map_osm_file_ptr, const float64_t origin_offset_l
     paramters.push_back(rclcpp::Parameter("elevation", elevation));
     options.parameter_overrides(paramters);
 
+    const auto map_node_ptr = std::make_shared<Lanelet2MapProviderNode>(options);
+
+
+    MapConfig map_config = MapConfig{map_osm_file,origin_offset_lat, origin_offset_lon, latitude, longitude, elevation};
+    boost::interprocess::shared_memory_object::remove("SharedMemory");
+    boost::interprocess::managed_shared_memory managed_shm(boost::interprocess::open_or_create, "SharedMemory", 1024);
+    managed_shm.construct<MapConfig>("MapConfig")(map_config);
+
+
+
     std::cout << "Create Node"<< std::endl;
-    const auto map_node_ptr =
-        std::make_shared<Lanelet2MapProviderNode>(options);
-    std::cout << "Create Node Complete"<< std::endl;
-    executor.add_node(map_node_ptr);
-    std::cout << "Add Node To Executor"<< std::endl;
-    std::thread executor_thread(std::bind(&rclcpp::executors::MultiThreadedExecutor::spin, &executor));
+    std::thread * executor_thread = new std::thread(start_thread, map_node_ptr);
     std::cout << "Thread Run"<< std::endl;
-    executor_thread.detach();
+    executor_thread->detach();
     std::cout << "Thread Detach"<< std::endl;
+
+    sleep(5);
+    std::cout << "Sleep Complete"<< std::endl;
+    return executor_thread;
+}
+
+void start_thread(std::shared_ptr<Lanelet2MapProviderNode> map_node_ptr){
+    rclcpp::spin(map_node_ptr);
 }
 
 void stop_service() {
@@ -100,11 +120,35 @@ void Lanelet2MapProviderNode::handle_request(
   std::shared_ptr<autoware_auto_msgs::srv::HADMapService_Request> request,
   std::shared_ptr<autoware_auto_msgs::srv::HADMapService_Response> response)
 {
+    std::cout << "Send Map Start"<< std::endl;
+    auto primitive_sequence = request->requested_primitives;
+
     autoware_auto_msgs::msg::HADMapBin msg;
     msg.header.frame_id = "map";
+    std::cout << "Start Open SharedMemory"<< std::endl;
+    boost::interprocess::managed_shared_memory managed_shm(boost::interprocess::open_only, "SharedMemory");
+    std::cout << "Find Lanelet2MapProvider"<< std::endl;
 
-    autoware::common::had_map_utils::toBinaryMsg(m_map_provider->m_map, msg);
+    // std::pair<int*, std::size_t> p = managed_shm.find<int>("Integer");
+    // if (p.first) {
+    //     std::cout << *p.first << std::endl;
+    // }
+    MapConfig *map_config = managed_shm.find<MapConfig>("MapConfig").first;
+
+    LatLonAlt adjusted_origin{map_config->latitude + map_config->origin_offset_lat, map_config->longitude + map_config->origin_offset_lon, map_config->elevation};
+    std::cout << "Load Map in handle_request"<< std::endl;
+
+    lanelet::ErrorMessages errors;
+    lanelet::GPSPoint originGps{adjusted_origin.lat, adjusted_origin.lon, adjusted_origin.alt};
+    lanelet::Origin origin{originGps};
+    lanelet::projection::UtmProjector projector(origin);
+
+    std::shared_ptr<lanelet::LaneletMap> m_map = lanelet::load(map_config->map_osm_file, projector, &errors);
+    autoware::common::had_map_utils::overwriteLaneletsCenterline(m_map, true);
+
+    autoware::common::had_map_utils::toBinaryMsg(m_map, msg);
     response->map = msg;
+    std::cout << "Send Map Complete"<< std::endl;
     return;
 }
 

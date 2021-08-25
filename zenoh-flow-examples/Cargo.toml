@@ -22,6 +22,9 @@ opencv = "0.53.0"
 
 lazy_static = "1.4.0"
 mut_static = "5.0.0"
+ffi-convert = "0.5.0"
+libc = "0.2.0"
+
 regex = "1"
 
 reqwest = { version = "0.11", features = ["blocking", "json"] }
@@ -43,98 +46,5 @@ serde_json = "1.0"
 
 
 [[example]]
-name = "example-fizz"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "example-buzz"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "example-buzz2"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "example-buzz3"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "random-source"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "counter-source"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "generic-sink"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "zenoh-sink"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "manual-source"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "manual-twonum"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "example-add"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "example-mul"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "generic-disp"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "sum-and-send"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "camera-source"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "face-detection"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "object-detection-dnn"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "video-sink"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "example-select"
-
-[[example]]
-name = "video-pipeline"
-
-[[example]]
-name = "video-file-source"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "frame-concat"
-crate-type = ["cdylib"]
-
-name = "lanelet2-map-input"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "lanelet2-map-operator"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "lanelet2-map-output"
+name = "replay-planner-operator"
 crate-type = ["cdylib"]

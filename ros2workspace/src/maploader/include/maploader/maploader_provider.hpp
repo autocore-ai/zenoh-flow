@@ -1,5 +1,5 @@
-#ifndef LANELET2_MAP_PROVIDER__LANELET2_MAP_PROVIDER_HPP_
-#define LANELET2_MAP_PROVIDER__LANELET2_MAP_PROVIDER_HPP_
+#ifndef MAPLOADER_PROVIDER_HPP_
+#define MAPLOADER_PROVIDER_HPP_
 
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <common/types.hpp>

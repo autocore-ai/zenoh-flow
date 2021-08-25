@@ -21,7 +21,7 @@ use zenoh_flow::{
     types::{
         DataTrait, FnOutputRule, FnSourceRun, FutRunResult, RunResult, SourceTrait, StateTrait,
     },
-    zf_data, ZFContext, ZFError, ZFLinkId, ZFResult,downcast,serde::{Deserialize, Serialize},zenoh_flow_derive::ZFState,
+    zf_data, ZFContext, ZFError, ZFResult,downcast,serde::{Deserialize, Serialize},zenoh_flow_derive::ZFState,
 };
 use zenoh_flow_examples::ZFString;
 
@@ -57,7 +57,7 @@ impl std::fmt::Debug for MapConfig {
     }
 }
 
-static LINK_ID_INPUT_STR: &str = "Config";
+static LINK_ID_INPUT_STR: &str = "Str";
 
 impl Lanelet2MapInput {
     fn init(configuration: HashMap<String, String>) -> ZFResult<Self> {
@@ -104,7 +104,7 @@ impl Lanelet2MapInput {
     }
 
     async fn run(_ctx: ZFContext) -> RunResult {
-        let mut results: HashMap<ZFLinkId, Arc<dyn DataTrait>> = HashMap::with_capacity(2);
+        let mut results: HashMap<String, Arc<dyn DataTrait>> = HashMap::with_capacity(1);
 
         println!("> Please input number to start map load: ");
         let mut numbers = String::new();

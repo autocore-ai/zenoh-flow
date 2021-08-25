@@ -17,7 +17,7 @@ use async_std::sync::Arc;
 use std::{thread, time};
 use std::ffi::CString;
 use std::os::raw::c_char;
-
+use std::ffi::c_void;
 use std::collections::HashMap;
 use zenoh_flow::{
     get_input,
@@ -25,7 +25,7 @@ use zenoh_flow::{
     types::{
         DataTrait,
         FnInputRule, FnSinkRun, FutSinkResult, InputRuleResult, SinkTrait, StateTrait, Token,
-        ZFContext, ZFInput, ZFLinkId,
+        ZFContext, ZFInput,
     },
     zenoh_flow_derive::ZFState,
     zf_empty_state, ZFResult,
@@ -35,10 +35,11 @@ use zenoh_flow_examples::ZFString;
 #[derive(Serialize, Deserialize, Debug, ZFState)]
 struct Lanelet2MapOutput {}
 
+const NULL:* mut c_void = 0 as *mut c_void;
 
 extern {
     fn start_maploader_service(map_osm_file_ptr: *const c_char, origin_offset_lat: f64, origin_offset_lon: f64, latitude: f64, 
-        longitude: f64, elevation: f64);
+        longitude: f64, elevation: f64) -> *mut c_void;
     fn stop_maploader_service();
 }
 
@@ -47,11 +48,11 @@ extern {
 extern crate lazy_static;
 extern crate mut_static;
 
-pub struct IsServiceStarted { value: usize }
+pub struct IsServiceStarted { value: usize, service_ptr: *mut c_void }
 
 impl IsServiceStarted {
-    pub fn new(value: usize) -> Self {
-        IsServiceStarted{ value: value }
+     pub fn new(value: usize) -> Self {
+        IsServiceStarted{ value, service_ptr: NULL}
     }
 
     pub fn get_value(&self) -> usize {
@@ -61,7 +62,17 @@ impl IsServiceStarted {
     pub fn set_value(&mut self, value: usize) {
         self.value = value
     }
+
+    pub fn get_ptr(&self) -> *mut c_void {
+        self.service_ptr
+    }
+
+    pub fn set_ptr(&mut self, service_ptr: *mut c_void) {
+            self.service_ptr = service_ptr
+    }
 }
+unsafe impl Send for IsServiceStarted{}
+unsafe impl Sync for IsServiceStarted{}
 
 #[derive(Serialize, Deserialize, ZFState, Clone)]
 struct MapConfig {
@@ -90,15 +101,15 @@ lazy_static! {
 }
 use mut_static::MutStatic;
 
-static LINK_ID_INPUT_STR: &str = "Config";
+static LINK_ID_INPUT_STR: &str = "Str";
 
 impl Lanelet2MapOutput {
-    pub fn ir_1(_ctx: ZFContext, _inputs: &mut HashMap<ZFLinkId, Token>) -> InputRuleResult {
+    pub fn ir_1(_ctx: ZFContext, _inputs: &mut HashMap<String, Token>) -> InputRuleResult {
         Ok(true)
     }
 
     pub async fn run_1(_ctx: ZFContext, mut inputs: ZFInput) -> ZFResult<()> {
-        let config_serialized = get_input!(ZFString, String::from(LINK_ID_INPUT_STR), inputs)?;
+        let (_, config_serialized) = get_input!(ZFString, String::from(LINK_ID_INPUT_STR), inputs)?;
 
         let config: MapConfig = serde_json::from_str(&(config_serialized.0)).unwrap();
         let is_service_started = IS_SERVICE_STARTED.read().unwrap().get_value();
@@ -106,10 +117,11 @@ impl Lanelet2MapOutput {
             unsafe {
                 let map_osm_file = CString::new(config.map_osm_file).expect("CString::new failed");
                 
-                start_maploader_service(map_osm_file.as_ptr(), config.origin_offset_lat, config.origin_offset_lon, 
+                let service_ptr = start_maploader_service(map_osm_file.as_ptr(), config.origin_offset_lat, config.origin_offset_lon, 
                     config.origin_lat, config.origin_lon, config.origin_alt);
-                let mut is_service_started_modify = IS_SERVICE_STARTED.write().unwrap();
-                is_service_started_modify.set_value(1);
+                    let mut is_service_started_modify = IS_SERVICE_STARTED.write().unwrap();
+                    is_service_started_modify.set_value(1);
+                    is_service_started_modify.set_ptr(service_ptr);
             }
             println!("Service Started!");
         } else {
@@ -118,11 +130,14 @@ impl Lanelet2MapOutput {
                 stop_maploader_service();
                 let sleep_time = time::Duration::from_millis(1000);
                 thread::sleep(sleep_time);
-
                 println!("Service Restarting!");
                 let map_osm_file = CString::new(config.map_osm_file).expect("CString::new failed");
-                start_maploader_service(map_osm_file.as_ptr(), config.origin_offset_lat, config.origin_offset_lon, 
+                let service_ptr = start_maploader_service(map_osm_file.as_ptr(), config.origin_offset_lat, config.origin_offset_lon, 
                     config.origin_lat, config.origin_lon, config.origin_alt);
+                unsafe {
+                    let mut is_service_started_modify = IS_SERVICE_STARTED.write().unwrap();
+                    is_service_started_modify.set_ptr(service_ptr);
+                }
                 thread::sleep(sleep_time);
             }
             println!("Service Started!");
