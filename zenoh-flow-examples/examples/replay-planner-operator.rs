@@ -67,30 +67,37 @@ impl ReplayPlannerOperatorGlobalVar {
         }
     }
 
-    // 可能用不上，如果不能直接修改field的话就把注释去掉
-    // pub fn get_m_planner(&self) -> *mut c_void {
-    //     self.m_planner
-    // }
+    pub fn get_m_planner(&self) -> *mut c_void {
+        self.m_planner_ptr
+    }
 
-    // pub fn set_m_planner(&mut self, m_planner: *mut c_void ) {
-    //     self.m_planner = m_planner;
-    // }
+    pub fn set_m_planner(&mut self, m_planner_ptr: *mut c_void ) {
+        self.m_planner_ptr = m_planner_ptr;
+    }
 
-    // pub fn get_m_goal_distance_threshold_m(&self) -> f32 {
-    //     self.m_goal_distance_threshold_m
-    // }
+    pub fn get_m_goal_distance_threshold_m(&self) -> f64 {
+        self.m_goal_distance_threshold_m
+    }
 
-    // pub fn set_m_goal_distance_threshold_m(&mut self, m_goal_distance_threshold_m: f32) {
-    //     self.m_goal_distance_threshold_m = m_goal_distance_threshold_m;
-    // }
+    pub fn set_m_goal_distance_threshold_m(&mut self, m_goal_distance_threshold_m: f64) {
+        self.m_goal_distance_threshold_m = m_goal_distance_threshold_m;
+    }
 
-    // pub fn get_m_goal_angle_threshold_rad(&self) -> f32 {
-    //     self.m_goal_angle_threshold_rad
-    // }
+    pub fn get_m_goal_angle_threshold_rad(&self) -> f64 {
+        self.m_goal_angle_threshold_rad
+    }
     
-    // pub fn set_m_goal_angle_threshold_rad(&mut self, m_goal_angle_threshold_rad: f32) {
-    //     self.m_goal_angle_threshold_rad = m_goal_angle_threshold_rad;
-    // }
+    pub fn set_m_goal_angle_threshold_rad(&mut self, m_goal_angle_threshold_rad: f64) {
+         self.m_goal_angle_threshold_rad = m_goal_angle_threshold_rad;
+    }
+
+//     pub fn get_m_odom_frame_id(&mut self) -> String {
+//         self.m_odom_frame_id.clone()
+//    }
+
+   pub fn set_m_odom_frame_id(&mut self, m_odom_frame_id: String) {
+       self.m_odom_frame_id = m_odom_frame_id;
+   }
 }
 
 #[macro_use]
@@ -100,8 +107,10 @@ use mut_static::MutStatic;
 
 lazy_static! {
     pub static ref GLOBAL_VAR: MutStatic<ReplayPlannerOperatorGlobalVar> = {
-        let ptr = m_planner_new();
-        MutStatic::from(ReplayPlannerOperatorGlobalVar::new(ptr))
+        unsafe{
+            let ptr = m_planner_new();
+            MutStatic::from(ReplayPlannerOperatorGlobalVar::new(ptr))
+        }
     };
 }
 
@@ -152,19 +161,19 @@ extern {
 
     fn m_planner_stop_replaying(ptr: *mut c_void);
 
-    fn m_planner_clear_record(ptr: *mut c_void);
+    //fn m_planner_clear_record(ptr: *mut c_void);
 
-    fn m_planner_record_state(ptr: *mut c_void, state_to_record: *mut CVehicleKinematicState) -> bool;
+    //fn m_planner_record_state(ptr: *mut c_void, state_to_record: *mut CVehicleKinematicState) -> bool;
 
-    fn m_planner_get_record_length(m_planner: *const c_void) -> i32;
+    //fn m_planner_get_record_length(m_planner: *const c_void) -> i32;
 
     fn m_planner_set_heading_weight(m_planner: *const c_void, heading_weight: f64);
 
-    fn m_planner_get_heading_weight(m_planner: *const c_void) -> f64;
+    //fn m_planner_get_heading_weight(m_planner: *const c_void) -> f64;
 
     fn m_planner_set_min_record_distance(m_planner: *const c_void, min_record_distance: f64);
 
-    fn m_planner_get_min_record_distance(m_planner: *const c_void) -> f64;
+    //fn m_planner_get_min_record_distance(m_planner: *const c_void) -> f64;
 
     fn m_planner_read_trajectory_buffer_from_file(m_planner: *const c_void, replay_path: *const c_char );
 
@@ -208,6 +217,12 @@ impl ReplayPlannerOperator {
             m_goal_distance_threshold_m,
             m_goal_angle_threshold_rad,
         };
+
+        let m_planner_ptr = GLOBAL_VAR.read().unwrap().m_planner_ptr;
+        unsafe {
+            m_planner_set_heading_weight(m_planner_ptr, heading_weight);
+            m_planner_set_min_record_distance(m_planner_ptr, min_record_distance);
+        }
 
         Ok(Self{config})
     }
@@ -283,12 +298,10 @@ impl ReplayPlannerOperator {
         let vehicle_state: VehicleKinematicState = bincode::deserialize(&(vehicle_state_msg.bytes)).unwrap();
         
         // 写全局变量
-        unsafe {
-            let m_odom_frame_id = GLOBAL_VAR.read().unwrap().m_odom_frame_id;
-            if m_odom_frame_id.is_empty() {
-                let mut global_var = GLOBAL_VAR.write().unwrap();
-                global_var.m_odom_frame_id = vehicle_state.header.frame_id;
-            }
+        let m_odom_frame_id = GLOBAL_VAR.read().unwrap().m_odom_frame_id.clone();
+        if m_odom_frame_id.is_empty() {
+            let mut global_var_write = GLOBAL_VAR.write().unwrap();
+            global_var_write.set_m_odom_frame_id(vehicle_state.header.frame_id.clone());
         }
 
         // 发送消息
@@ -302,7 +315,11 @@ impl ReplayPlannerOperator {
 
                 record_replay_state = RecordReplayState::REPLAYING;
                 remaining_length = trajectory.points.len() as i32;
-                result.insert(String::from(LINK_ID_OUTPUT_PLANNED_TRAJECTORY), zf_data!(trajectory));
+
+                let trajectory_data = ZFBytes {
+                    bytes: bincode::serialize(&trajectory).unwrap(),
+                };
+                result.insert(String::from(LINK_ID_OUTPUT_PLANNED_TRAJECTORY), zf_data!(trajectory_data));
             }
 
 
@@ -319,7 +336,11 @@ impl ReplayPlannerOperator {
             record_replay_state: record_replay_state as i32,
             remaining_length: remaining_length,
         };
-        result.insert(String::from(LINK_ID_OUTPUT_REPLAY_TRAJECTORY_FEEDBACK), zf_data!(replay_trajectory_feedback));
+
+        let replay_trajectory_feedback_data = ZFBytes {
+            bytes: bincode::serialize(&replay_trajectory_feedback).unwrap(),
+        };
+        result.insert(String::from(LINK_ID_OUTPUT_REPLAY_TRAJECTORY_FEEDBACK), zf_data!(replay_trajectory_feedback_data));
         Ok(result)
     }
 
