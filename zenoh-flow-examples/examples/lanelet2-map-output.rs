@@ -24,7 +24,7 @@ use zenoh_flow::{
     serde::{Deserialize, Serialize},
     types::{
         DataTrait,
-        FnInputRule, FnSinkRun, FutSinkResult, InputRuleResult, SinkTrait, StateTrait, Token,
+        FnInputRule, FnSinkRun, FutSinkOutput, InputRuleOutput, SinkTrait, StateTrait, Token,
         ZFContext, ZFInput,
     },
     zenoh_flow_derive::ZFState,
@@ -104,7 +104,7 @@ use mut_static::MutStatic;
 static LINK_ID_INPUT_STR: &str = "Str";
 
 impl Lanelet2MapOutput {
-    pub fn ir_1(_ctx: ZFContext, _inputs: &mut HashMap<String, Token>) -> InputRuleResult {
+    pub fn ir_1(_ctx: ZFContext, _inputs: &mut HashMap<String, Token>) -> InputRuleOutput {
         Ok(true)
     }
 
@@ -160,7 +160,7 @@ impl SinkTrait for Lanelet2MapOutput {
         println!("get_run_1");
         let gctx = ctx.lock();
         match gctx.mode {
-            0 => Box::new(|ctx: ZFContext, inputs: ZFInput| -> FutSinkResult {
+            0 => Box::new(|ctx: ZFContext, inputs: ZFInput| -> FutSinkOutput {
                 Box::pin(Self::run_1(ctx, inputs))
             }),
             _ => panic!("No way"),

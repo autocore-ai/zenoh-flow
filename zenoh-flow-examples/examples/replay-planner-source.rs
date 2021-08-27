@@ -1,0 +1,59 @@
+//
+// Copyright (c) 2017, 2021 ADLINK Technology Inc.
+//
+// This program and the accompanying materials are made available under the
+// terms of the Eclipse Public License 2.0 which is available at
+// http://www.eclipse.org/legal/epl-2.0, or the Apache License, Version 2.0
+// which is available at https://www.apache.org/licenses/LICENSE-2.0.
+//
+// SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
+//
+// Contributors:
+//   ADLINK zenoh team, <zenoh@adlink-labs.tech>
+//
+
+use std::{collections::HashMap, sync::Arc, usize};
+
+use zenoh_flow::{
+    types::{
+        DataTrait, FnOutputRule, FnSourceRun, FutRunOutput, RunOutput, SourceTrait, StateTrait,
+    },
+    zf_data, zf_empty_state, ZFContext, ZFError, ZFResult,
+};
+use zenoh_flow_examples::ZFString;
+
+struct ReplayPlannerSource;
+
+static LINK_ID_INPUT: &str = "input";
+
+impl ReplayPlannerSource {
+    async fn run(_ctx: ZFContext) -> RunOutput {
+        let mut results: HashMap<String, Arc<dyn DataTrait>> = HashMap::with_capacity(1);
+        println!("zenoh-flow start");
+        results.insert(String::from(LINK_ID_INPUT), zf_data!(ZFString("input".to_string())));
+        async_std::task::sleep(std::time::Duration::from_millis(100)).await;
+        Ok(results)
+    }
+}
+
+impl SourceTrait for ReplayPlannerSource {
+    fn get_run(&self, _ctx: ZFContext) -> FnSourceRun {
+        Box::new(|ctx: ZFContext| -> FutRunOutput { Box::pin(Self::run(ctx)) })
+    }
+
+    fn get_output_rule(&self, _ctx: ZFContext) -> Box<FnOutputRule> {
+        Box::new(zenoh_flow::default_output_rule)
+    }
+
+    fn get_state(&self) -> Box<dyn StateTrait> {
+        zf_empty_state!()
+    }
+}
+
+zenoh_flow::export_source!(register);
+
+extern "C" fn register(
+    _configuration: Option<HashMap<String, String>>,
+) -> ZFResult<Box<dyn zenoh_flow::SourceTrait + Send>> {
+    Ok(Box::new(ReplayPlannerSource {}) as Box<dyn zenoh_flow::SourceTrait + Send>)
+}

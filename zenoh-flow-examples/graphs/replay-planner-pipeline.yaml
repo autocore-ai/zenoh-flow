@@ -1,0 +1,41 @@
+flow: ReplayPlanner
+
+operators:
+  - id: ReplayPlannerOperator
+    uri: file://./target/debug/examples/libexample_fizz.dylib
+    inputs:
+      - id: vehicle_state
+        type: data
+      - id: replay_trajectory_goal
+        type: data
+    outputs:
+      - id: planned_trajectory
+        type: data
+      - id: replay_trajectory_feedback
+        type: data
+sources:
+  - id: ManualSenderOperator
+    uri: file://./target/debug/examples/libmanual_source.dylib
+    output:
+      id: Int
+      type: u64
+
+sinks:
+  - id: ReceiverOperator
+    uri: file://./target/debug/examples/libgeneric_sink.dylib
+    input:
+      id: Str
+      type: string
+
+links:
+  - from: ManualSenderOperator.Int
+    to: FizzOperator.Int
+
+  - from: FizzOperator.Int
+    to: BuzzOperator.Int
+
+  - from: FizzOperator.Str
+    to: BuzzOperator.Str
+
+  - from: BuzzOperator.Str
+    to: ReceiverOperator.Str

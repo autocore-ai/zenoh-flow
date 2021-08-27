@@ -24,6 +24,7 @@ lazy_static = "1.4.0"
 mut_static = "5.0.0"
 ffi-convert = "0.5.0"
 libc = "0.2.0"
+csv = "1.1"
 
 regex = "1"
 
@@ -37,7 +38,6 @@ uhlc = { git = "https://github.com/atolab/uhlc-rs.git", branch = "master" }
 
 [dev-dependencies]
 rand = "0.8.0"
-opencv = "0.53.0"
 serde = { version = "1.0.55", features = ["derive"] }
 async-std = { version = "=1.9.0", features = ["attributes","unstable"] }
 futures = "0.3.5"
@@ -47,4 +47,20 @@ serde_json = "1.0"
 
 [[example]]
 name = "replay-planner-operator"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "replay-planner-start-operator"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "replay-planner-end-operator"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "replay-planner-source"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "replay-planner-sink"
 crate-type = ["cdylib"]
