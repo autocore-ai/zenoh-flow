@@ -55,44 +55,46 @@ impl ReplayPlannerEndOperator {
     }
 
     fn run(_ctx: ZFContext, mut inputs: ZFInput) -> RunOutput {
+        println!("zenoh-flow-end operator start");
         let mut result = HashMap::<String, Arc<dyn DataTrait>>::with_capacity(1);
-        //接收反馈消息
-        let (timestamp, replay_trajectory_feedback)= match get_input!(ZFBytes, String::from(LINK_ID_INPUT_REPLAY_TRAJECTORY_FEEDBACK), inputs) {
-            Ok((timestamp, replay_trajectory_feedback)) => (timestamp, replay_trajectory_feedback),
-            Err(e) => {
-                if e == ZFError::MissingInput(LINK_ID_INPUT_REPLAY_TRAJECTORY_FEEDBACK.to_string()) {
-                    println!("Missing Input {}", LINK_ID_INPUT_REPLAY_TRAJECTORY_FEEDBACK.to_string());
-                    let buf = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
-                    (Timestamp::new(NTP64(0), ID::new(0, buf)), ZFBytes{bytes: Vec::new()})
-                } else {
-                    return Err(e);
-                }
-            }
-        };
-        if !replay_trajectory_feedback.bytes.is_empty() {
-            let replay_trajectory_feedback: ReplayTrajectoryFeedback = bincode::deserialize(&(replay_trajectory_feedback.bytes)).unwrap();
-            println!("Received replay_trajectory_feedback, trajectory_length is {}, planner_status is {}", replay_trajectory_feedback.remaining_length, replay_trajectory_feedback.record_replay_state);
-        }
+        // //接收反馈消息
+        // let (timestamp, replay_trajectory_feedback)= match get_input!(ZFBytes, String::from(LINK_ID_INPUT_REPLAY_TRAJECTORY_FEEDBACK), inputs) {
+        //     Ok((timestamp, replay_trajectory_feedback)) => (timestamp, replay_trajectory_feedback),
+        //     Err(e) => {
+        //         if e == ZFError::MissingInput(LINK_ID_INPUT_REPLAY_TRAJECTORY_FEEDBACK.to_string()) {
+        //             println!("Missing Input {}", LINK_ID_INPUT_REPLAY_TRAJECTORY_FEEDBACK.to_string());
+        //             let buf = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        //             (Timestamp::new(NTP64(0), ID::new(0, buf)), ZFBytes{bytes: Vec::new()})
+        //         } else {
+        //             return Err(e);
+        //         }
+        //     }
+        // };
+        // if !replay_trajectory_feedback.bytes.is_empty() {
+        //     let replay_trajectory_feedback: ReplayTrajectoryFeedback = bincode::deserialize(&(replay_trajectory_feedback.bytes)).unwrap();
+        //     println!("Received replay_trajectory_feedback, trajectory_length is {}, planner_status is {}", replay_trajectory_feedback.remaining_length, replay_trajectory_feedback.record_replay_state);
+        // }
 
-        //接收规划好的路径
-        let (timestamp, trajectory_data)= match get_input!(ZFBytes, String::from(LINK_ID_INPUT_PLANNED_TRAJECTORY), inputs) {
-            Ok((timestamp, trajectory_data)) => (timestamp, trajectory_data),
-            Err(e) => {
-                if e == ZFError::MissingInput(LINK_ID_INPUT_PLANNED_TRAJECTORY.to_string()) {
-                    println!("Missing Input {}", LINK_ID_INPUT_PLANNED_TRAJECTORY.to_string());
-                    let buf = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
-                    (Timestamp::new(NTP64(0), ID::new(0, buf)), ZFBytes{bytes: Vec::new()})
-                } else {
-                    return Err(e);
-                }
-            }
-        };
-        if !trajectory_data.bytes.is_empty() {
-            let trajectory_data: Trajectory = bincode::deserialize(&(trajectory_data.bytes)).unwrap();
-            println!("Received planned_trajectory_data, planned_trajectory_length is {}", trajectory_data.points.len());
-        }
+        // //接收规划好的路径
+        // let (timestamp, trajectory_data)= match get_input!(ZFBytes, String::from(LINK_ID_INPUT_PLANNED_TRAJECTORY), inputs) {
+        //     Ok((timestamp, trajectory_data)) => (timestamp, trajectory_data),
+        //     Err(e) => {
+        //         if e == ZFError::MissingInput(LINK_ID_INPUT_PLANNED_TRAJECTORY.to_string()) {
+        //             println!("Missing Input {}", LINK_ID_INPUT_PLANNED_TRAJECTORY.to_string());
+        //             let buf = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        //             (Timestamp::new(NTP64(0), ID::new(0, buf)), ZFBytes{bytes: Vec::new()})
+        //         } else {
+        //             return Err(e);
+        //         }
+        //     }
+        // };
+        // if !trajectory_data.bytes.is_empty() {
+        //     let trajectory_data: Trajectory = bincode::deserialize(&(trajectory_data.bytes)).unwrap();
+        //     println!("Received planned_trajectory_data, planned_trajectory_length is {}", trajectory_data.points.len());
+        // }
 
-        result.insert(String::from(LINK_ID_OUTPUT), zf_data!(ZFString("end".to_string())));
+        // result.insert(String::from(LINK_ID_OUTPUT), zf_data!(ZFString("end".to_string())));
+        println!("zenoh-flow-end operator end");
         Ok(result)
     }
 }

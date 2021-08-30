@@ -6,5 +6,5 @@ fn main() {
     let path = Path::new(&*pwd_dir).join("lib");
     println!("cargo:rustc-env=LD_LIBRARY_PATH={}", path.to_str().unwrap());
     println!("cargo:rustc-link-search=native={}", path.to_str().unwrap());
-    println!("cargo:rustc-link-lib=dylib=maploader");
+    println!("cargo:rustc-link-lib=dylib=replay_planner");
 }

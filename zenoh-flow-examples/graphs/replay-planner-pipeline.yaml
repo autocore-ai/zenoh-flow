@@ -1,8 +1,19 @@
 flow: ReplayPlanner
 
 operators:
+  - id: ReplayPlannerStartOperator
+    uri: file://./target/debug/examples/libreplay_planner_start_operator.so
+    inputs:
+      - id: input
+        type: string
+    outputs:
+      - id: vehicle_state
+        type: data
+      - id: replay_trajectory_goal
+        type: data
+
   - id: ReplayPlannerOperator
-    uri: file://./target/debug/examples/libexample_fizz.dylib
+    uri: file://./target/debug/examples/libreplay_planner_operator.so
     inputs:
       - id: vehicle_state
         type: data
@@ -13,29 +24,52 @@ operators:
         type: data
       - id: replay_trajectory_feedback
         type: data
+    configuration:
+        heading_weight: 0.1
+        min_record_distance: 0.5
+        m_goal_distance_threshold_m: 0.75
+        m_goal_angle_threshold_rad: 1.57
+
+  - id: ReplayPlannerEndOperator
+    uri: file://./target/debug/examples/libreplay_planner_end_operator.so
+    inputs:
+      - id: planned_trajectory
+        type: data
+      - id: replay_trajectory_feedback
+        type: data
+    outputs:
+      - id: output
+        type: string
+
 sources:
-  - id: ManualSenderOperator
-    uri: file://./target/debug/examples/libmanual_source.dylib
+  - id: ReplayPlannerSource
+    uri: file://./target/debug/examples/libreplay_planner_source.so
     output:
-      id: Int
-      type: u64
+      id: input
+      type: string
 
 sinks:
-  - id: ReceiverOperator
-    uri: file://./target/debug/examples/libgeneric_sink.dylib
+  - id: ReplayPlannerSink
+    uri: file://./target/debug/examples/libreplay_planner_sink.so
     input:
-      id: Str
+      id: output
       type: string
 
 links:
-  - from: ManualSenderOperator.Int
-    to: FizzOperator.Int
+  - from: ReplayPlannerSource.input
+    to: ReplayPlannerStartOperator.input
 
-  - from: FizzOperator.Int
-    to: BuzzOperator.Int
+  - from: ReplayPlannerStartOperator.vehicle_state
+    to: ReplayPlannerOperator.vehicle_state
 
-  - from: FizzOperator.Str
-    to: BuzzOperator.Str
+  - from: ReplayPlannerStartOperator.replay_trajectory_goal
+    to: ReplayPlannerOperator.replay_trajectory_goal
 
-  - from: BuzzOperator.Str
-    to: ReceiverOperator.Str
+  - from: ReplayPlannerOperator.planned_trajectory
+    to: ReplayPlannerEndOperator.planned_trajectory
+
+  - from: ReplayPlannerOperator.replay_trajectory_feedback
+    to: ReplayPlannerEndOperator.replay_trajectory_feedback
+
+  - from: ReplayPlannerEndOperator.output
+    to: ReplayPlannerSink.output

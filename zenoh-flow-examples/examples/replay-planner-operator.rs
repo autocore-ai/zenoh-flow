@@ -20,7 +20,7 @@ mod tf2_msgs;
 use async_std::sync::Arc;
 use std::collections::HashMap;
 use zenoh_flow::{
-    export_operator, get_input,
+    export_operator, get_input, downcast,
     types::{
         DataTrait, FnInputRule, FnOutputRule, FnRun, InputRuleOutput, OperatorTrait,
         OutputRuleOutput, RunOutput, StateTrait, ZFInput, ZFResult, ZFError
@@ -32,7 +32,7 @@ use zenoh_flow::{
 use zenoh_flow_examples::{ZFString, ZFUsize, ZFBytes};
 
 use uhlc::{Timestamp, NTP64, ID};
-use std::ffi::{CString, c_void};
+use std::ffi::{CString, c_void, CStr};
 use libc::c_char;
 
 use autoware_auto_msgs::msg::{VehicleKinematicState, CVehicleKinematicState, Trajectory, CTrajectory};
@@ -52,6 +52,7 @@ const NULL: *mut c_void = 0 as *mut c_void;
 
 //全局变量
 pub struct ReplayPlannerOperatorGlobalVar {
+    is_initialized: bool,
     m_planner_ptr: *mut c_void,
     m_goal_distance_threshold_m: f64, 
     m_goal_angle_threshold_rad: f64, 
@@ -60,6 +61,7 @@ pub struct ReplayPlannerOperatorGlobalVar {
 impl ReplayPlannerOperatorGlobalVar {
     pub fn new(ptr: *mut c_void) -> Self {
         ReplayPlannerOperatorGlobalVar{
+            is_initialized: false,
             m_planner_ptr: ptr, 
             m_goal_distance_threshold_m: 0.0,
             m_goal_angle_threshold_rad: 0.0,
@@ -95,9 +97,18 @@ impl ReplayPlannerOperatorGlobalVar {
 //         self.m_odom_frame_id.clone()
 //    }
 
-   pub fn set_m_odom_frame_id(&mut self, m_odom_frame_id: String) {
+    pub fn set_m_odom_frame_id(&mut self, m_odom_frame_id: String) {
        self.m_odom_frame_id = m_odom_frame_id;
-   }
+    }
+   
+    pub fn get_is_initialized(&mut self) -> bool{
+        self.is_initialized
+    }
+
+    pub fn set_is_initialized(&mut self, is_initialized: bool) {
+        self.is_initialized = is_initialized;
+    }
+
 }
 
 #[macro_use]
@@ -108,8 +119,7 @@ use mut_static::MutStatic;
 lazy_static! {
     pub static ref GLOBAL_VAR: MutStatic<ReplayPlannerOperatorGlobalVar> = {
         unsafe{
-            let ptr = m_planner_new();
-            MutStatic::from(ReplayPlannerOperatorGlobalVar::new(ptr))
+            MutStatic::from(ReplayPlannerOperatorGlobalVar::new(NULL))
         }
     };
 }
@@ -177,9 +187,9 @@ extern {
 
     fn m_planner_read_trajectory_buffer_from_file(m_planner_ptr: *mut c_void, replay_path: *const c_char );
 
-    fn m_planner_plan(m_planner_ptr: *mut c_void, current_state: *mut autoware_auto_msgs::msg::CVehicleKinematicState) -> autoware_auto_msgs::msg::CTrajectory;
+    fn m_planner_plan(m_planner_ptr: *mut c_void, current_state: autoware_auto_msgs::msg::CVehicleKinematicState) -> autoware_auto_msgs::msg::CTrajectory;
 
-    fn m_planner_reached_goal(m_planner_ptr: *mut c_void, current_state: *mut autoware_auto_msgs::msg::CVehicleKinematicState, distance_thresh: f64, angle_thresh: f64) -> bool;
+    fn m_planner_reached_goal(m_planner_ptr: *mut c_void, current_state: autoware_auto_msgs::msg::CVehicleKinematicState, distance_thresh: f64, angle_thresh: f64) -> bool;
 }
 
 
@@ -218,12 +228,6 @@ impl ReplayPlannerOperator {
             m_goal_angle_threshold_rad,
         };
 
-        let m_planner_ptr = GLOBAL_VAR.read().unwrap().m_planner_ptr;
-        unsafe {
-            m_planner_set_heading_weight(m_planner_ptr, heading_weight);
-            m_planner_set_min_record_distance(m_planner_ptr, min_record_distance);
-        }
-
         Ok(Self{config})
     }
 
@@ -240,6 +244,24 @@ impl ReplayPlannerOperator {
 
     fn run(_ctx: ZFContext, mut inputs: ZFInput) -> RunOutput {
         let mut result = HashMap::<String, Arc<dyn DataTrait>>::with_capacity(1);
+        println!("zenoh-flow operator start");
+        if  GLOBAL_VAR.read().unwrap().is_initialized == false {
+            println!("init start");
+            unsafe {
+                let guard = _ctx.lock();
+                let config = downcast!(Config, guard.state).unwrap();
+                
+                let m_planner_ptr = m_planner_new();
+                m_planner_set_heading_weight(m_planner_ptr, config.heading_weight);
+                m_planner_set_min_record_distance(m_planner_ptr, config.min_record_distance);
+                let mut global_var_write = GLOBAL_VAR.write().unwrap();
+                global_var_write.set_is_initialized(true);
+                global_var_write.set_m_planner(m_planner_ptr);
+            }
+            println!("init end");
+        } else {
+            println!("init ???");
+        }
 
         //接收启动信号
         let (timestamp, replay_trajectory_goal)= match get_input!(ZFBytes, String::from(LINK_ID_INPUT_REPLAY_TRAJECTORY_GOAL), inputs) {
@@ -260,19 +282,21 @@ impl ReplayPlannerOperator {
         if !replay_trajectory_goal.bytes.is_empty() {
             // 收到Record路径消息
             let replay_trajectory_goal: ReplayTrajectoryGoal = bincode::deserialize(&(replay_trajectory_goal.bytes)).unwrap();
+            let m_planner_ptr = GLOBAL_VAR.read().unwrap().m_planner_ptr;
             unsafe {
-                let m_planner_ptr = GLOBAL_VAR.read().unwrap().m_planner_ptr;
                 record_replay_state = m_planner_get_record_replay_state(m_planner_ptr);
-                if record_replay_state == RecordReplayState::REPLAYING as i32{
-                    println!("{}", "Can't start replaying if already are");
-                } else {
-                    // 开始replay
-                    println!("{}", "start replay");
-                    let replay_path = CString::new(replay_trajectory_goal.replay_path).expect("CString::new failed");
+            }
+            if record_replay_state == RecordReplayState::REPLAYING as i32{
+                println!("{}", "Can't start replaying if already are");
+            } else {
+                // 开始replay
+                println!("{}", "start replay");
+                let replay_path = CString::new(replay_trajectory_goal.replay_path).expect("CString::new failed");
+                unsafe {
                     m_planner_read_trajectory_buffer_from_file(m_planner_ptr, replay_path.as_ptr());
                     m_planner_start_replaying(m_planner_ptr);
-                    record_replay_state = RecordReplayState::REPLAYING as i32
                 }
+                record_replay_state = RecordReplayState::REPLAYING as i32
             }
         }
 
@@ -305,7 +329,7 @@ impl ReplayPlannerOperator {
             return Ok(result)
         }  
         let vehicle_state: VehicleKinematicState = bincode::deserialize(&(vehicle_state_msg.bytes)).unwrap();
-        
+        let vehicle_state_copy: VehicleKinematicState = bincode::deserialize(&(vehicle_state_msg.bytes)).unwrap();
         // 写全局变量
         let m_odom_frame_id = GLOBAL_VAR.read().unwrap().m_odom_frame_id.clone();
         if m_odom_frame_id.is_empty() {
@@ -317,11 +341,21 @@ impl ReplayPlannerOperator {
         unsafe {
             let m_planner_ptr = GLOBAL_VAR.read().unwrap().m_planner_ptr;
             let c_vehicle_state = CVehicleKinematicState::c_repr_of(vehicle_state).unwrap();
-            let current_state_ptr = Box::into_raw(Box::new(c_vehicle_state));
             if m_planner_is_replaying(m_planner_ptr) {
                 println!("Replaying recorded ego postion as trajectory");
-                let traj_raw = m_planner_plan(m_planner_ptr, current_state_ptr);
+                let traj_raw = m_planner_plan(m_planner_ptr, c_vehicle_state);
+
+                //println!("received trajectory {}", traj_raw.points.len());
+
+                //let c_str: &CStr = unsafe { CStr::from_ptr(traj_raw.header.frame_id) };
+                let rust_string = CStr::from_ptr(traj_raw.header.frame_id).to_string_lossy().into_owned();
+
+                println!("received frame id: {}", rust_string);
+                
+
+                println!("trajectory number: {}", traj_raw.points.size);
                 let trajectory = traj_raw.as_rust().unwrap();
+                println!("end trajectory: {}", rust_string);
 
                 record_replay_state = RecordReplayState::REPLAYING as i32;
                 remaining_length = trajectory.points.len() as i32;
@@ -331,8 +365,8 @@ impl ReplayPlannerOperator {
                 };
                 result.insert(String::from(LINK_ID_OUTPUT_PLANNED_TRAJECTORY), zf_data!(trajectory_data));
             }
-
-            if m_planner_reached_goal(m_planner_ptr, current_state_ptr,
+            let c_vehicle_state_copy = CVehicleKinematicState::c_repr_of(vehicle_state_copy).unwrap();
+            if m_planner_reached_goal(m_planner_ptr, c_vehicle_state_copy,
                  GLOBAL_VAR.read().unwrap().m_goal_distance_threshold_m, 
                  GLOBAL_VAR.read().unwrap().m_goal_angle_threshold_rad) {
                     record_replay_state = RecordReplayState::SUCCESS as i32;
@@ -350,6 +384,7 @@ impl ReplayPlannerOperator {
             bytes: bincode::serialize(&replay_trajectory_feedback).unwrap(),
         };
         result.insert(String::from(LINK_ID_OUTPUT_REPLAY_TRAJECTORY_FEEDBACK), zf_data!(replay_trajectory_feedback_data));
+        println!("zenoh-flow operator end");
         Ok(result)
     }
 

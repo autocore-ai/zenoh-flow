@@ -128,6 +128,7 @@ static LINK_ID_OUTPUT_REPLAY_TRAJECTORY_GOAL: &str = "replay_trajectory_goal";  
 impl ReplayPlannerStartOperator {
 
     fn input_rule(_ctx: ZFContext, inputs: &mut HashMap<String, Token>) -> InputRuleOutput {
+        println!("zenoh-flow-start input_rule");
         for token in inputs.values() {
             match token {
                 Token::Ready(_) => continue,
@@ -139,10 +140,10 @@ impl ReplayPlannerStartOperator {
     }
 
     fn run(_ctx: ZFContext, mut inputs: ZFInput) -> RunOutput {
+        println!("zenoh-flow-start operator start");
         let mut results: HashMap<String, Arc<dyn DataTrait>> = HashMap::with_capacity(1);
-
         let (_, input) = get_input!(ZFString, String::from(LINK_ID_INPUT_COMMAND), inputs)?;
-
+        println!("zenoh-flow receive message {}", input.0);
         // 刚启动，没开始
         let is_initialized = GLOBAL_VAR.read().unwrap().get_is_initialized();
 
@@ -236,16 +237,19 @@ impl ReplayPlannerStartOperator {
             GLOBAL_VAR.write().unwrap().set_record_index(record_index + 1);
         }
         //results.insert(String::from(LINK_ID_OUTPUT_REPLAY_TRAJECTORY_GOAL), zf_data!(ZFUsize(value)));
+        println!("zenoh-flow-start operator end");
         Ok(results)
     }
 }
 
 impl OperatorTrait for ReplayPlannerStartOperator {
     fn get_input_rule(&self, _ctx: ZFContext) -> Box<FnInputRule> {
+        println!("zenoh-flow-start input_rule run");
         Box::new(ReplayPlannerStartOperator::input_rule)
     }
 
     fn get_run(&self, _ctx: ZFContext) -> Box<FnRun> {
+        println!("zenoh-flow-start start run");
         Box::new(ReplayPlannerStartOperator::run)
     }
 
