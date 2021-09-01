@@ -2,16 +2,16 @@ flow: RandomGeneration
 operators: []
 sources:
   - id : RandomGenerator
-    uri: file://./target/debug/examples/librandom_source.dylib
+    uri: file://./target/debug/examples/librandom_source.so
     output:
         id: Random
-        type: usize
+        type: string
 sinks:
   - id : PrintSink
-    uri: file://./target/debug/examples/libgeneric_sink.dylib
+    uri: file://./target/debug/examples/libgeneric_sink.so
     input:
         id: Data
-        type: usize
+        type: string
 links:
 - from: RandomGenerator.Random
   to: PrintSink.Data

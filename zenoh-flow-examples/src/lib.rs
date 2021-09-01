@@ -40,11 +40,11 @@ pub struct ZFBytes {
 #[derive(Debug, Clone, Serialize, Deserialize, ZFData)]
 pub struct ZFDouble(pub f64);
 
-#[derive(Debug, Serialize, Deserialize, ZFData)]
-pub struct ZFOpenCVBytes {
-    #[serde(skip_serializing, skip_deserializing)]
-    pub bytes: Mutex<RefCell<opencv::types::VectorOfu8>>,
-}
+// #[derive(Debug, Serialize, Deserialize, ZFData)]
+// pub struct ZFOpenCVBytes {
+//     #[serde(skip_serializing, skip_deserializing)]
+//     pub bytes: Mutex<RefCell<opencv::types::VectorOfu8>>,
+// }
 
 // #[derive(Debug, ZFData)]
 // pub struct OpenCVMat {

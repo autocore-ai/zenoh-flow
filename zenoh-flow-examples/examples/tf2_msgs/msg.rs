@@ -1,4 +1,4 @@
-use ffi_convert::*;
+use cxx::{CxxVector, UniquePtr};
 use zenoh_flow::serde::{Deserialize, Serialize};
 
 use crate::*;
@@ -7,11 +7,4 @@ use crate::*;
 #[derive(Serialize, Deserialize)]
 pub struct TFMessage {
     pub transforms: Vec<geometry_msgs::msg::TransformStamped>,
-}
-
-#[repr(C)]
-#[derive(CReprOf, AsRust, CDrop)]
-#[target_type(TFMessage)]
-pub struct CTFMessage {
-    pub transforms: CArray<geometry_msgs::msg::CTransformStamped>,
 }
