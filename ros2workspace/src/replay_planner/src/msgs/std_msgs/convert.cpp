@@ -4,10 +4,8 @@
 CHeader convert_header_to_cheader(std_msgs::msg::Header &header) {
     CHeader cheader;
     cheader.stamp = convert_time_to_ctime(header.stamp);
-    // TODO 字符串出范围后会被释放，需要解决
-    char *string_heap = (char *)malloc(header.frame_id.size());
-    strcpy(string_heap, header.frame_id.c_str());
-    cheader.frame_id = string_heap;
+    // TODO 使用CXX穿越C++和Rust的边界
+    cheader.frame_id = header.frame_id;
     return cheader;
 }
 

@@ -3,10 +3,10 @@
 
 #include "replay_planner/msgs/std_msgs/CHeader.hpp"
 #include "replay_planner/msgs/geometry_msgs/CTransform.hpp"
-
+#include <string>
 struct CTransformStamped {
     CHeader header;
-    const char *child_frame_id;
+    std::string child_frame_id;
     CTransform transform;
 };
 

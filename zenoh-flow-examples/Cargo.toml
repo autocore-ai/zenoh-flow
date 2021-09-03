@@ -37,7 +37,6 @@ uhlc = { git = "https://github.com/atolab/uhlc-rs.git", branch = "master" }
 cxx = "1.0.52"
 autocxx = "0.11.1"
 
-
 [dev-dependencies]
 rand = "0.8.0"
 serde = { version = "1.0.55", features = ["derive"] }
