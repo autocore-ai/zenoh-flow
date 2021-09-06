@@ -33,11 +33,9 @@ use zenoh_flow::{
 use zenoh_flow_examples::{ZFString, ZFUsize, ZFBytes};
 
 use uhlc::{Timestamp, NTP64, ID};
-use libc::c_char;
 
-use autoware_auto_msgs::msg::{VehicleKinematicState, Trajectory};
+use autoware_auto_msgs::msg::{VehicleKinematicState};
 use autoware_auto_msgs::action::{ReplayTrajectoryGoal, ReplayTrajectoryFeedback};
-
 //use ffi_convert::*;
 
 //use autocxx::include_cpp;
@@ -49,32 +47,34 @@ static LINK_ID_INPUT_REPLAY_TRAJECTORY_GOAL: &str = "replay_trajectory_goal";   
 static LINK_ID_OUTPUT_PLANNED_TRAJECTORY: &str = "planned_trajectory";  //规划好的轨迹
 static LINK_ID_OUTPUT_REPLAY_TRAJECTORY_FEEDBACK: &str = "replay_trajectory_feedback";  //当前规划器状态
 
-use ffi::motion::plannner::recordreplay_planner::RecordReplayPlanner;
+use ffi::ReplayPlannerNode;
+use std::slice;
+use std::ffi::{CString,CStr};
 //全局变量
 pub struct ReplayPlannerOperatorGlobalVar {
     is_initialized: bool,
-    m_planner_ptr: UniquePtr<RecordReplayPlanner>,
+    m_planner_node_ptr: * mut autocxx::c_void,
     m_goal_distance_threshold_m: f64, 
     m_goal_angle_threshold_rad: f64, 
     m_odom_frame_id: String,
 }
 impl ReplayPlannerOperatorGlobalVar {
-    pub fn new(ptr: UniquePtr<RecordReplayPlanner>) -> Self {
+    pub fn new(ptr: * mut autocxx::c_void) -> Self {
         ReplayPlannerOperatorGlobalVar{
             is_initialized: false,
-            m_planner_ptr: ptr, 
+            m_planner_node_ptr: ptr, 
             m_goal_distance_threshold_m: 0.0,
             m_goal_angle_threshold_rad: 0.0,
             m_odom_frame_id: String::new(),
         }
     }
 
-    pub fn get_m_planner(&self) -> &UniquePtr<RecordReplayPlanner> {
-        &self.m_planner_ptr
+    pub fn get_m_planner(&self) -> * mut autocxx::c_void {
+        self.m_planner_node_ptr
     }
 
-    pub fn set_m_planner(&mut self, m_planner_ptr: UniquePtr<RecordReplayPlanner> ) {
-        self.m_planner_ptr = m_planner_ptr;
+    pub fn set_m_planner(&mut self, m_planner_ptr: * mut autocxx::c_void) {
+        self.m_planner_node_ptr = m_planner_ptr;
     }
 
     pub fn get_m_goal_distance_threshold_m(&self) -> f64 {
@@ -119,7 +119,7 @@ use mut_static::MutStatic;
 lazy_static! {
     pub static ref GLOBAL_VAR: MutStatic<ReplayPlannerOperatorGlobalVar> = {
         unsafe{
-            MutStatic::from(ReplayPlannerOperatorGlobalVar::new(UniquePtr::<RecordReplayPlanner>::null()))
+            MutStatic::from(ReplayPlannerOperatorGlobalVar::new(0 as * mut autocxx::c_void))
         }
     };
 }
@@ -175,18 +175,19 @@ autocxx::include_cpp! {
 
     #include "replay_planner/msgs/std_msgs/CHeader.hpp"
 
+    #include "replay_planner/recordreplay_planner.hpp"
     safety!(unsafe_ffi)
 
-    generate!("m_planner_new")
-    generate!("m_planner_get_record_replay_state")
-    generate!("m_planner_is_replaying")
-    generate!("m_planner_start_replaying")
-    generate!("m_planner_stop_replaying")
-    generate!("m_planner_set_heading_weight")
-    generate!("m_planner_set_min_record_distance")
-    generate!("m_planner_read_trajectory_buffer_from_file")
-    generate!("m_planner_plan")
-    generate!("m_planner_reached_goal")
+    //generate!("RecordReplayPlannerNode::RecordReplayPlannerNode")
+    // generate!("m_planner_get_record_replay_state")
+    // generate!("m_planner_is_replaying")
+    // generate!("m_planner_start_replaying")
+    // generate!("m_planner_stop_replaying")
+    // generate!("m_planner_set_heading_weight")
+    // generate!("m_planner_set_min_record_distance")
+    // generate!("m_planner_read_trajectory_buffer_from_file")
+    // generate!("m_planner_plan")
+    // generate!("m_planner_reached_goal")
     
     generate_pod!("CComplex32")
     generate_pod!("CTrajectory")
@@ -202,133 +203,137 @@ autocxx::include_cpp! {
     generate_pod!("CVector3")
 
     generate_pod!("CHeader")
+    generate!("getReplayPlannerNode")
+    generate!("ReplayPlannerNode")
 }
 
-// #[cxx::bridge]
-// mod ffi2 {
-//     pub struct CVehicleKinematicState {
-//         pub header: CHeader,
-//         pub state: CTrajectoryPoint,
-//         pub delta: CTransform
-//     }
+#[cxx::bridge]
+mod ffi2 {
+    // pub struct CVehicleKinematicState {
+    //     pub header: CHeader,
+    //     pub state: CTrajectoryPoint,
+    //     pub delta: CTransform
+    // }
 
-//     pub struct CTrajectoryPoint {
-//         pub time_from_start: CDuration,
-//         pub x: f32,
-//         pub y: f32,
-//         pub heading: CComplex32,
-//         pub longitudinal_velocity_mps: f32,
-//         pub lateral_velocity_mps: f32,
-//         pub acceleration_mps2: f32,
-//         pub heading_rate_rps: f32,
-//         pub front_wheel_angle_rad: f32,
-//         pub rear_wheel_angle_rad: f32,   
-//     }
+    // pub struct CTrajectoryPoint {
+    //     pub time_from_start: CDuration,
+    //     pub x: f32,
+    //     pub y: f32,
+    //     pub heading: CComplex32,
+    //     pub longitudinal_velocity_mps: f32,
+    //     pub lateral_velocity_mps: f32,
+    //     pub acceleration_mps2: f32,
+    //     pub heading_rate_rps: f32,
+    //     pub front_wheel_angle_rad: f32,
+    //     pub rear_wheel_angle_rad: f32,   
+    // }
 
-//     pub struct CComplex32 {
-//         pub real: f32,
-//         pub imag: f32,
-//     }
+    // pub struct CComplex32 {
+    //     pub real: f32,
+    //     pub imag: f32,
+    // }
 
-//     pub struct CTrajectory {
-//         pub header: CHeader, 
-//         pub points: Vec<CTrajectoryPoint>,
-//     }
+    // pub struct CTrajectory {
+    //     pub header: CHeader, 
+    //     pub points: Vec<CTrajectoryPoint>,
+    // }
 
-//     pub struct CReplayTrajectoryFeedback {
-//         pub record_replay_state: i32,
-//         pub remaining_length: i32,
-//     }
+    // pub struct CReplayTrajectoryFeedback {
+    //     pub record_replay_state: i32,
+    //     pub remaining_length: i32,
+    // }
 
-//     pub struct CReplayTrajectoryGoal {
-//         pub replay_path: String,
-//     }
+    // pub struct CReplayTrajectoryGoal {
+    //     pub replay_path: String,
+    // }
 
-//     pub struct CTime {
-//         pub sec: i32,
-//         pub nanosec: u32
-//     }
-//     pub struct CDuration {
-//         pub sec: i32,
-//         pub nanosec: u32,
-//     }
+    // pub struct CTime {
+    //     pub sec: i32,
+    //     pub nanosec: u32
+    // }
+    // pub struct CDuration {
+    //     pub sec: i32,
+    //     pub nanosec: u32,
+    // }
 
-//     pub struct CTransform {
-//         pub translation: CVector3,
-//         pub rotation: CQuaternion,
-//     }
-//     pub struct CVector3 {
-//         pub x: f64,
-//         pub y: f64,
-//         pub z: f64,
-//     }
+    // pub struct CTransform {
+    //     pub translation: CVector3,
+    //     pub rotation: CQuaternion,
+    // }
+    // pub struct CVector3 {
+    //     pub x: f64,
+    //     pub y: f64,
+    //     pub z: f64,
+    // }
     
-//     pub struct CQuaternion {
-//         pub x: f64,
-//         pub y: f64,
-//         pub z: f64,
-//         pub w: f64,
-//     }
+    // pub struct CQuaternion {
+    //     pub x: f64,
+    //     pub y: f64,
+    //     pub z: f64,
+    //     pub w: f64,
+    // }
     
-//     pub struct CTransformStamped {
-//         pub header: CHeader,
-//         pub child_frame_id: String,
-//         pub transform: CTransform,
-//     }
+    // pub struct CTransformStamped {
+    //     pub header: CHeader,
+    //     pub child_frame_id: String,
+    //     pub transform: CTransform,
+    // }
     
-//     pub struct CHeader {
-//         pub stamp: CTime,
-//         pub frame_id: String,
-//     }
+    // pub struct CHeader {
+    //     pub stamp: CTime,
+    //     pub frame_id: String,
+    // }
 
-//     unsafe extern "C++" {
-//         include!("zenoh-flow-examples/replay_planner/replay_planner_wrapper.hpp");
-//         include!("zenoh-flow-examples/replay_planner/msgs/autoware_auto_msgs/CComplex32.hpp");
-//         include!("zenoh-flow-examples/replay_planner/msgs/autoware_auto_msgs/CTrajectory.hpp");
-//         include!("zenoh-flow-examples/replay_planner/msgs/autoware_auto_msgs/CTrajectoryPoint.hpp");
-//         include!("zenoh-flow-examples/replay_planner/msgs/autoware_auto_msgs/CVehicleKinematicState.hpp");
+    //impl  UniquePtr<RecordReplayPlanner> {}
 
-//         include!("zenoh-flow-examples/replay_planner/msgs/builtin_interfaces/CDuration.hpp");
-//         include!("zenoh-flow-examples/replay_planner/msgs/builtin_interfaces/CTime.hpp");
+    unsafe extern "C++" {
+        include!("replay_planner/replay_planner_wrapper.hpp");
+        include!("replay_planner/msgs/autoware_auto_msgs/CComplex32.hpp");
+        include!("replay_planner/msgs/autoware_auto_msgs/CTrajectory.hpp");
+        include!("replay_planner/msgs/autoware_auto_msgs/CTrajectoryPoint.hpp");
+        include!("replay_planner/msgs/autoware_auto_msgs/CVehicleKinematicState.hpp");
 
-//         include!("zenoh-flow-examples/replay_planner/msgs/geometry_msgs/CQuaternion.hpp");
-//         include!("zenoh-flow-examples/replay_planner/msgs/geometry_msgs/CTransform.hpp");
-//         include!("zenoh-flow-examples/replay_planner/msgs/geometry_msgs/CTransformStamped.hpp");
-//         include!("zenoh-flow-examples/replay_planner/msgs/geometry_msgs/CVector3.hpp");
+        include!("replay_planner/msgs/builtin_interfaces/CDuration.hpp");
+        include!("replay_planner/msgs/builtin_interfaces/CTime.hpp");
 
-//         include!("zenoh-flow-examples/replay_planner/msgs/std_msgs/CHeader.hpp");
+        include!("replay_planner/msgs/geometry_msgs/CQuaternion.hpp");
+        include!("replay_planner/msgs/geometry_msgs/CTransform.hpp");
+        include!("replay_planner/msgs/geometry_msgs/CTransformStamped.hpp");
+        include!("replay_planner/msgs/geometry_msgs/CVector3.hpp");
 
-//         type CComplex32;
-//         type CTrajectory;
-//         type CTrajectoryPoint;
-//         type CVehicleKinematicState;
+        include!("replay_planner/msgs/std_msgs/CHeader.hpp");
 
-//         type CDuration;
-//         type CTime;
+        type CComplex32 = crate::ffi::CComplex32;
+        type CTrajectory = crate::ffi::CTrajectory;
+        type CTrajectoryPoint = crate::ffi::CTrajectoryPoint;
+        type CVehicleKinematicState = crate::ffi::CVehicleKinematicState;
+
+        type CDuration = crate::ffi::CDuration;
+        type CTime = crate::ffi::CTime;
+
+        type CQuaternion = crate::ffi::CQuaternion;
+        type CTransform = crate::ffi::CTransform;
+        type CTransformStamped = crate::ffi::CTransformStamped;
+        type CVector3 = crate::ffi::CVector3;
+
+        type CHeader = crate::ffi::CHeader;
+        type ReplayPlannerNode = crate::ffi::ReplayPlannerNode;
+
         
-//         type CQuaternion;
-//         type CTransform;
-//         type CTransformStamped;
-//         type CVector3;
+        // fn m_planner_new() -> UniquePtr<RecordReplayPlanner>;
+        // fn m_planner_get_record_replay_state(m_planner_ptr: &UniquePtr<RecordReplayPlanner>) -> i32;
+        // fn m_planner_is_replaying(m_planner_ptr: &UniquePtr<RecordReplayPlanner>) -> bool;
+        // fn m_planner_start_replaying(m_planner_ptr: &UniquePtr<RecordReplayPlanner>);
+        // fn m_planner_stop_replaying(m_planner_ptr: &UniquePtr<RecordReplayPlanner>);
 
-//         type CHeader;
+        // fn m_planner_set_heading_weight(m_planner_ptr: &UniquePtr<RecordReplayPlanner>, heading_weight: f64);
+        // fn m_planner_set_min_record_distance(m_planner_ptr: &UniquePtr<RecordReplayPlanner>, min_record_distance: f64);
 
-//         type RecordReplayPlanner;
-
-//         fn m_planner_new() -> UniquePtr<RecordReplayPlanner>;
-//         fn m_planner_get_record_replay_state(m_planner_ptr: &UniquePtr<RecordReplayPlanner>) -> i32;
-//         fn m_planner_is_replaying(m_planner_ptr: &UniquePtr<RecordReplayPlanner>) -> bool;
-//         fn m_planner_start_replaying(m_planner_ptr: &UniquePtr<RecordReplayPlanner>);
-//         fn m_planner_stop_replaying(m_planner_ptr: &UniquePtr<RecordReplayPlanner>);
-
-//         fn m_planner_set_heading_weight(m_planner_ptr: &UniquePtr<RecordReplayPlanner>, heading_weight: f64);
-//         fn m_planner_set_min_record_distance(m_planner_ptr: &UniquePtr<RecordReplayPlanner>, min_record_distance: f64);
-
-//         fn m_planner_read_trajectory_buffer_from_file(m_planner_ptr: &UniquePtr<RecordReplayPlanner>, replay_path: String);
-//         fn m_planner_plan(m_planner_ptr: &UniquePtr<RecordReplayPlanner>, current_state: &CVehicleKinematicState) -> CTrajectory;
-//         fn m_planner_reached_goal(m_planner_ptr: &UniquePtr<RecordReplayPlanner>, current_state: &CVehicleKinematicState, distance_thresh: f64, angle_thresh: f64) -> bool;
-//     }
-// }
+        // fn m_planner_read_trajectory_buffer_from_file(m_planner_ptr: &UniquePtr<RecordReplayPlanner>, replay_path: String);
+        // fn m_planner_plan(m_planner_ptr: &UniquePtr<RecordReplayPlanner>, current_state: &CVehicleKinematicState) -> CTrajectory;
+        // fn m_planner_reached_goal(m_planner_ptr: &UniquePtr<RecordReplayPlanner>, current_state: &CVehicleKinematicState, distance_thresh: f64, angle_thresh: f64) -> bool;
+    }
+}
 
 // extern {
 //     // 创建一个recordreplay_planner指针
@@ -423,14 +428,20 @@ impl ReplayPlannerOperator {
                 let guard = _ctx.lock();
                 let config = downcast!(Config, guard.state).unwrap();
 
-                let m_planner_ptr = ffi::m_planner_new();
+                let m_planner_node = ffi::getReplayPlannerNode();
+                let m_planner_node_ptr = m_planner_node as  * mut ffi::ReplayPlannerNode;
+                let mut m_planner_node_ptr_pin =  unsafe { std :: pin :: Pin :: new_unchecked ( & mut  * m_planner_node_ptr) };
 
-                ffi::m_planner_set_heading_weight(&m_planner_ptr, config.heading_weight);
-                ffi::m_planner_set_min_record_distance(&m_planner_ptr, config.min_record_distance);
+                m_planner_node_ptr_pin.as_mut().m_planner_set_heading_weight(config.heading_weight);
+                m_planner_node_ptr_pin.as_mut().m_planner_set_min_record_distance(config.min_record_distance);
+                // //m_planner_node_ptr.m_planner_set_heading_weight(config.heading_weight);
+                // // ffi::m_planner_set_heading_weight(m_planner_ptr, config.heading_weight);
+                // // ffi::m_planner_set_min_record_distance(m_planner_ptr, config.min_record_distance);
 
+                
                 let mut global_var_write = GLOBAL_VAR.write().unwrap();
-                global_var_write.set_is_initialized(true);
-                global_var_write.set_m_planner(m_planner_ptr);
+                // global_var_write.set_is_initialized(true);
+                global_var_write.set_m_planner(m_planner_node);
             }
             println!("init end");
         } else {
@@ -456,9 +467,12 @@ impl ReplayPlannerOperator {
         if !replay_trajectory_goal.bytes.is_empty() {
             // 收到Record路径消息
             let replay_trajectory_goal: ReplayTrajectoryGoal = bincode::deserialize(&(replay_trajectory_goal.bytes)).unwrap();
-            let m_planner_ptr = &GLOBAL_VAR.read().unwrap().m_planner_ptr;
+            let m_planner_node = GLOBAL_VAR.read().unwrap().m_planner_node_ptr.clone();
+            let m_planner_node_ptr = m_planner_node as  * mut ffi::ReplayPlannerNode;
+            let mut m_planner_node_ptr_pin =  unsafe { std :: pin :: Pin :: new_unchecked ( & mut  * m_planner_node_ptr) };
             unsafe {
-                record_replay_state = ffi::m_planner_get_record_replay_state(&m_planner_ptr);
+                //record_replay_state = ffi::ReplayPlannerNode::m_planner_get_record_replay_state(*m_planner_ptr.as_mut().unwrap());
+                // record_replay_state = m_planner_ptr_pin.m_planner_get_record_replay_state();
             }
             if record_replay_state == RecordReplayState::REPLAYING as i32{
                 println!("{}", "Can't start replaying if already are");
@@ -466,9 +480,13 @@ impl ReplayPlannerOperator {
                 // 开始replay
                 println!("start replay");
                 unsafe {
-                    ffi::m_planner_read_trajectory_buffer_from_file(&m_planner_ptr, &replay_trajectory_goal.replay_path);
+                    //ffi::ReplayPlannerNode::m_planner_get_record_replay_state(m_planner_ptr.as_mut().unwrap());
+                    m_planner_node_ptr_pin.as_mut().m_planner_read_trajectory_buffer_from_file(replay_trajectory_goal.replay_path);
                 }
-                unsafe {ffi::m_planner_start_replaying(&m_planner_ptr);}
+                unsafe {
+                    m_planner_node_ptr_pin.as_mut().m_planner_start_replaying();
+                    //ffi::ReplayPlannerNode::m_planner_start_replaying(m_planner_ptr.as_mut().unwrap());
+                }
                 record_replay_state = RecordReplayState::REPLAYING as i32
             }
         }
@@ -512,18 +530,24 @@ impl ReplayPlannerOperator {
 
         // 发送消息
         unsafe {
-            let m_planner_ptr = &GLOBAL_VAR.read().unwrap().m_planner_ptr;
+            //let m_planner_node = GLOBAL_VAR.read().unwrap().m_planner_node_ptr;
+            //let mut m_planner_ptr_pin =  unsafe { std :: pin :: Pin :: new_unchecked ( & mut  * m_planner_node_ptr) };
+            let m_planner_node = GLOBAL_VAR.read().unwrap().m_planner_node_ptr.clone();
+            let m_planner_node_ptr = m_planner_node as  * mut ffi::ReplayPlannerNode;
+            let mut m_planner_node_ptr_pin =  unsafe { std :: pin :: Pin :: new_unchecked ( & mut  * m_planner_node_ptr) };
 
             let c_stamp= ffi::CTime {
                 sec: vehicle_state.header.stamp.sec,
                 nanosec: vehicle_state.header.stamp.nanosec,
             };
+            
             let c_header = ffi::CHeader{
                 stamp: c_stamp,
-                frame_id: vehicle_state.header.frame_id,
+                frame_id: CString::new(vehicle_state.header.frame_id.clone()).expect("CString::new failed").as_ptr(),
+                size: vehicle_state.header.frame_id.len() as i32,
             };
 
-            let c_vector = ffi::CVector3 {
+            let c_vector = ffi2::CVector3 {
                 x: vehicle_state.delta.translation.x,
                 y: vehicle_state.delta.translation.y,
                 z: vehicle_state.delta.translation.z,
@@ -581,14 +605,18 @@ impl ReplayPlannerOperator {
             // let delta = crate::ffi::CTransform::make_unique1(translation, rotation);
             // let c_vehicle_state = crate::ffi::CVehicleKinematicState::make_unique1(header, state, delta);
 
-            if ffi::m_planner_is_replaying(&m_planner_ptr) {
+            if m_planner_node_ptr_pin.m_planner_is_replaying() {
                 println!("Replaying recorded ego postion as trajectory");
             
-                let traj_raw = ffi::m_planner_plan(&m_planner_ptr, &c_vehicle_state);
+                let m_planner_node = GLOBAL_VAR.read().unwrap().m_planner_node_ptr.clone();
+                let m_planner_node_ptr = m_planner_node as  * mut ffi::ReplayPlannerNode;
+                let mut m_planner_node_ptr_pin =  unsafe { std :: pin :: Pin :: new_unchecked ( & mut  * m_planner_node_ptr) };
+
+                let traj_raw = m_planner_node_ptr_pin.m_planner_plan(c_vehicle_state);
 
                 //println!("received trajectory {}", traj_raw.points.len());
                 //let frame_id = crate::ffi::CHeader::get_frame_id(crate::ffi::CTrajectory::get_header(traj_raw.pin_mut()).pin_mut());
-                let frame_id = &traj_raw.header.frame_id;
+                let frame_id = CStr::from_ptr(traj_raw.header.frame_id).to_str().unwrap().to_string();
                 //let c_str: &CStr = unsafe { CStr::from_ptr(traj_raw.header.frame_id) };
                 println!("received frame id: {}", frame_id);
                 
@@ -598,12 +626,13 @@ impl ReplayPlannerOperator {
                 };
                 let header_msg = std_msgs::msg::Header {
                     stamp: time_msg,
-                    frame_id: traj_raw.header.frame_id,
+                    frame_id: CStr::from_ptr(traj_raw.header.frame_id).to_str().unwrap().to_string(),
                 };
 
                 let mut trajectory_points = Vec::new();
-                for index in 0..traj_raw.points.len() {
-                    let trajectory_point_raw = traj_raw.points.get(index).unwrap();
+                let trajectory_points_raw = unsafe {slice::from_raw_parts(traj_raw.points, traj_raw.size as usize)};
+                for index in 0..traj_raw.size {
+                    let trajectory_point_raw = &trajectory_points_raw[index as usize];
                     let duration = builtin_interfaces::msg::Duration {
                         sec: trajectory_point_raw.time_from_start.sec,
                         nanosec: trajectory_point_raw.time_from_start.nanosec,
@@ -713,12 +742,78 @@ impl ReplayPlannerOperator {
                 result.insert(String::from(LINK_ID_OUTPUT_PLANNED_TRAJECTORY), zf_data!(trajectory_data));
             }
 
-            if ffi::m_planner_reached_goal(&m_planner_ptr, &c_vehicle_state,
+            let m_planner_node = GLOBAL_VAR.read().unwrap().m_planner_node_ptr.clone();
+            let m_planner_node_ptr = m_planner_node as  * mut ffi::ReplayPlannerNode;
+            let mut m_planner_node_ptr_pin =  unsafe { std :: pin :: Pin :: new_unchecked ( & mut  * m_planner_node_ptr) };
+
+
+            let c_stamp= ffi::CTime {
+                sec: vehicle_state.header.stamp.sec,
+                nanosec: vehicle_state.header.stamp.nanosec,
+            };
+            
+            let c_header = ffi::CHeader{
+                stamp: c_stamp,
+                frame_id: CString::new(vehicle_state.header.frame_id.clone()).expect("CString::new failed").as_ptr(),
+                size: vehicle_state.header.frame_id.len() as i32,
+            };
+
+            let c_vector = ffi2::CVector3 {
+                x: vehicle_state.delta.translation.x,
+                y: vehicle_state.delta.translation.y,
+                z: vehicle_state.delta.translation.z,
+            };
+
+            let c_quaternion = ffi::CQuaternion {
+                x: vehicle_state.delta.rotation.x,
+                y: vehicle_state.delta.rotation.y,
+                z: vehicle_state.delta.rotation.z,
+                w: vehicle_state.delta.rotation.w,
+            };
+            let c_delta = ffi::CTransform {
+                translation: c_vector,
+                rotation: c_quaternion,
+            };
+
+            let duration = ffi::CDuration {
+                sec: vehicle_state.state.time_from_start.sec,
+                nanosec: vehicle_state.state.time_from_start.nanosec,
+            };
+
+            let complex = ffi::CComplex32 {
+                real: vehicle_state.state.heading.real,
+                imag: vehicle_state.state.heading.imag,
+            };
+            
+            let c_state = ffi::CTrajectoryPoint {
+                time_from_start: duration,
+                x: vehicle_state.state.x,
+                y: vehicle_state.state.y,
+                heading: complex,
+                longitudinal_velocity_mps: vehicle_state.state.longitudinal_velocity_mps,
+                lateral_velocity_mps: vehicle_state.state.lateral_velocity_mps,
+                acceleration_mps2: vehicle_state.state.acceleration_mps2,
+                heading_rate_rps: vehicle_state.state.heading_rate_rps,
+                front_wheel_angle_rad: vehicle_state.state.front_wheel_angle_rad,
+                rear_wheel_angle_rad: vehicle_state.state.rear_wheel_angle_rad,
+            };
+            let c_vehicle_state = ffi::CVehicleKinematicState { 
+                header: c_header,
+                state: c_state,
+                delta: c_delta,
+            };
+
+            if m_planner_node_ptr_pin.m_planner_reached_goal(c_vehicle_state,
                  GLOBAL_VAR.read().unwrap().m_goal_distance_threshold_m, 
                  GLOBAL_VAR.read().unwrap().m_goal_angle_threshold_rad) == true {
+
+                    let m_planner_node = GLOBAL_VAR.read().unwrap().m_planner_node_ptr.clone();
+                    let m_planner_node_ptr = m_planner_node as  * mut ffi::ReplayPlannerNode;
+                    let mut m_planner_node_ptr_pin =  unsafe { std :: pin :: Pin :: new_unchecked ( & mut  * m_planner_node_ptr) };
+                    
                     record_replay_state = RecordReplayState::SUCCESS as i32;
                     remaining_length = 0;
-                    ffi::m_planner_stop_replaying(&m_planner_ptr);
+                    m_planner_node_ptr_pin.m_planner_stop_replaying();
             }
         }
 

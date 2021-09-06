@@ -5,7 +5,8 @@ CHeader convert_header_to_cheader(std_msgs::msg::Header &header) {
     CHeader cheader;
     cheader.stamp = convert_time_to_ctime(header.stamp);
     // TODO 使用CXX穿越C++和Rust的边界
-    cheader.frame_id = header.frame_id;
+    cheader.frame_id = header.frame_id.c_str();
+    cheader.size = header.frame_id.size();
     return cheader;
 }
 

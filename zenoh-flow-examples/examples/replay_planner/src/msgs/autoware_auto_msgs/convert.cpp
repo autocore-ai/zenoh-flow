@@ -22,13 +22,14 @@ CTrajectory convert_trajectory_to_ctrajectory(autoware_auto_msgs::msg::Trajector
     for(auto &element : trajectory.points) {
         vector_ctrajectorypoint.push_back(convert_trajectorypoint_to_ctrajectorypoint(element));
     }
-    ctrajectory.points = vector_ctrajectorypoint;
+    ctrajectory.points = vector_ctrajectorypoint.data();
+    ctrajectory.size = vector_ctrajectorypoint.size();
     return ctrajectory;
 }
 
 autoware_auto_msgs::msg::Trajectory convert_ctrajectory_to_trajectory(CTrajectory &ctrajectory) {
     autoware_auto_msgs::msg::Trajectory trajectory;
-    std::vector<CTrajectoryPoint> ctrajectoryPoint = ctrajectory.points;
+    std::vector<CTrajectoryPoint> ctrajectoryPoint = std::vector<CTrajectoryPoint>(ctrajectory.points, ctrajectory.points + ctrajectory.size);
      rosidl_runtime_cpp::BoundedVector<autoware_auto_msgs::msg::TrajectoryPoint, 100U> boundedvector_trajectorypoint;
     for(auto &element : ctrajectoryPoint) {
         boundedvector_trajectorypoint.push_back(convert_ctrajectorypoint_to_trajectorypoint(element));

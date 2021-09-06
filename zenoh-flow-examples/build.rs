@@ -12,7 +12,6 @@ fn main() {
     // .compile("random-source");
     
     let path1 = PathBuf::from("examples/replay_planner/include/");
-    //let pathx = PathBuf::from("examples/replay_planner/include/replay_planner/msgs/");
     let path2 = PathBuf::from("/home/shenmintao/adehome/AutowareAuto/install/autoware_auto_msgs/include");
     let path3 = PathBuf::from("/opt/ros/foxy/include/");
     let path4 = PathBuf::from("/home/shenmintao/adehome/AutowareAuto/install/motion_common/include/");

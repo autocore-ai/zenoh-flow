@@ -3,10 +3,12 @@
 
 #include "replay_planner/msgs/builtin_interfaces/CTime.hpp"
 #include <string>
+#include <cstdint>
 
 struct CHeader {
     CTime stamp;
-    std::string frame_id;
+    const char *frame_id;
+    int32_t size;
 };
 
 #endif

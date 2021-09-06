@@ -6,7 +6,8 @@
 
 struct CTrajectory {
     CHeader header;
-    std::vector<CTrajectoryPoint> points;
+    const CTrajectoryPoint* points;
+    int32_t size;
 };
 
 #endif
