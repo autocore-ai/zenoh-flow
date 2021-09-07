@@ -1,11 +1,14 @@
 #include "replay_planner/msgs/std_msgs/convert.hpp"
 #include "replay_planner/msgs/builtin_interfaces/convert.hpp"
 #include <string.h>
+#include <iostream>
 CHeader convert_header_to_cheader(std_msgs::msg::Header &header) {
     CHeader cheader;
     cheader.stamp = convert_time_to_ctime(header.stamp);
     // TODO 使用CXX穿越C++和Rust的边界
-    cheader.frame_id = header.frame_id.c_str();
+    char* ptr = new char[header.frame_id.size() + 1];
+    strcpy(ptr,  header.frame_id.c_str());
+    cheader.frame_id = ptr;
     cheader.size = header.frame_id.size();
     return cheader;
 }

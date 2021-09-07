@@ -31,15 +31,16 @@ impl ReplayPlannerSource {
         let mut results: HashMap<String, Arc<dyn DataTrait>> = HashMap::with_capacity(1);
         println!("zenoh-flow start");
 
-        println!("> Please input number to start map load: ");
-        let mut numbers = String::new();
-        async_std::io::stdin()
-            .read_line(&mut numbers)
-            .await
-            .expect("Could not read number.");
+        // println!("> Please input number to start map load: ");
+        // let mut numbers = String::new();
+        // async_std::io::stdin()
+        //     .read_line(&mut numbers)
+        //     .await
+        //     .expect("Could not read number.");
             
         results.insert(String::from(LINK_ID_INPUT), zf_data!(ZFString::from("input")));
         println!("zenoh-flow start finish");
+        async_std::task::sleep(std::time::Duration::from_secs(1)).await;
         Ok(results)
     }
 }

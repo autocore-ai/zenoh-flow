@@ -207,168 +207,6 @@ autocxx::include_cpp! {
     generate!("ReplayPlannerNode")
 }
 
-#[cxx::bridge]
-mod ffi2 {
-    // pub struct CVehicleKinematicState {
-    //     pub header: CHeader,
-    //     pub state: CTrajectoryPoint,
-    //     pub delta: CTransform
-    // }
-
-    // pub struct CTrajectoryPoint {
-    //     pub time_from_start: CDuration,
-    //     pub x: f32,
-    //     pub y: f32,
-    //     pub heading: CComplex32,
-    //     pub longitudinal_velocity_mps: f32,
-    //     pub lateral_velocity_mps: f32,
-    //     pub acceleration_mps2: f32,
-    //     pub heading_rate_rps: f32,
-    //     pub front_wheel_angle_rad: f32,
-    //     pub rear_wheel_angle_rad: f32,   
-    // }
-
-    // pub struct CComplex32 {
-    //     pub real: f32,
-    //     pub imag: f32,
-    // }
-
-    // pub struct CTrajectory {
-    //     pub header: CHeader, 
-    //     pub points: Vec<CTrajectoryPoint>,
-    // }
-
-    // pub struct CReplayTrajectoryFeedback {
-    //     pub record_replay_state: i32,
-    //     pub remaining_length: i32,
-    // }
-
-    // pub struct CReplayTrajectoryGoal {
-    //     pub replay_path: String,
-    // }
-
-    // pub struct CTime {
-    //     pub sec: i32,
-    //     pub nanosec: u32
-    // }
-    // pub struct CDuration {
-    //     pub sec: i32,
-    //     pub nanosec: u32,
-    // }
-
-    // pub struct CTransform {
-    //     pub translation: CVector3,
-    //     pub rotation: CQuaternion,
-    // }
-    // pub struct CVector3 {
-    //     pub x: f64,
-    //     pub y: f64,
-    //     pub z: f64,
-    // }
-    
-    // pub struct CQuaternion {
-    //     pub x: f64,
-    //     pub y: f64,
-    //     pub z: f64,
-    //     pub w: f64,
-    // }
-    
-    // pub struct CTransformStamped {
-    //     pub header: CHeader,
-    //     pub child_frame_id: String,
-    //     pub transform: CTransform,
-    // }
-    
-    // pub struct CHeader {
-    //     pub stamp: CTime,
-    //     pub frame_id: String,
-    // }
-
-    //impl  UniquePtr<RecordReplayPlanner> {}
-
-    unsafe extern "C++" {
-        include!("replay_planner/replay_planner_wrapper.hpp");
-        include!("replay_planner/msgs/autoware_auto_msgs/CComplex32.hpp");
-        include!("replay_planner/msgs/autoware_auto_msgs/CTrajectory.hpp");
-        include!("replay_planner/msgs/autoware_auto_msgs/CTrajectoryPoint.hpp");
-        include!("replay_planner/msgs/autoware_auto_msgs/CVehicleKinematicState.hpp");
-
-        include!("replay_planner/msgs/builtin_interfaces/CDuration.hpp");
-        include!("replay_planner/msgs/builtin_interfaces/CTime.hpp");
-
-        include!("replay_planner/msgs/geometry_msgs/CQuaternion.hpp");
-        include!("replay_planner/msgs/geometry_msgs/CTransform.hpp");
-        include!("replay_planner/msgs/geometry_msgs/CTransformStamped.hpp");
-        include!("replay_planner/msgs/geometry_msgs/CVector3.hpp");
-
-        include!("replay_planner/msgs/std_msgs/CHeader.hpp");
-
-        type CComplex32 = crate::ffi::CComplex32;
-        type CTrajectory = crate::ffi::CTrajectory;
-        type CTrajectoryPoint = crate::ffi::CTrajectoryPoint;
-        type CVehicleKinematicState = crate::ffi::CVehicleKinematicState;
-
-        type CDuration = crate::ffi::CDuration;
-        type CTime = crate::ffi::CTime;
-
-        type CQuaternion = crate::ffi::CQuaternion;
-        type CTransform = crate::ffi::CTransform;
-        type CTransformStamped = crate::ffi::CTransformStamped;
-        type CVector3 = crate::ffi::CVector3;
-
-        type CHeader = crate::ffi::CHeader;
-        type ReplayPlannerNode = crate::ffi::ReplayPlannerNode;
-
-        
-        // fn m_planner_new() -> UniquePtr<RecordReplayPlanner>;
-        // fn m_planner_get_record_replay_state(m_planner_ptr: &UniquePtr<RecordReplayPlanner>) -> i32;
-        // fn m_planner_is_replaying(m_planner_ptr: &UniquePtr<RecordReplayPlanner>) -> bool;
-        // fn m_planner_start_replaying(m_planner_ptr: &UniquePtr<RecordReplayPlanner>);
-        // fn m_planner_stop_replaying(m_planner_ptr: &UniquePtr<RecordReplayPlanner>);
-
-        // fn m_planner_set_heading_weight(m_planner_ptr: &UniquePtr<RecordReplayPlanner>, heading_weight: f64);
-        // fn m_planner_set_min_record_distance(m_planner_ptr: &UniquePtr<RecordReplayPlanner>, min_record_distance: f64);
-
-        // fn m_planner_read_trajectory_buffer_from_file(m_planner_ptr: &UniquePtr<RecordReplayPlanner>, replay_path: String);
-        // fn m_planner_plan(m_planner_ptr: &UniquePtr<RecordReplayPlanner>, current_state: &CVehicleKinematicState) -> CTrajectory;
-        // fn m_planner_reached_goal(m_planner_ptr: &UniquePtr<RecordReplayPlanner>, current_state: &CVehicleKinematicState, distance_thresh: f64, angle_thresh: f64) -> bool;
-    }
-}
-
-// extern {
-//     // 创建一个recordreplay_planner指针
-//     fn m_planner_new() -> *mut c_void;
-
-//     // 获得recordreplay_planner的状态
-//     fn m_planner_get_record_replay_state(m_planner_ptr: *mut c_void) -> i32;
-
-//     fn m_planner_is_replaying(m_planner_ptr: *mut c_void) -> bool;
-
-//     fn m_planner_start_replaying(m_planner_ptr: *mut c_void);
-
-//     fn m_planner_stop_replaying(m_planner_ptr: *mut c_void);
-
-//     //fn m_planner_clear_record(ptr: *mut c_void);
-
-//     //fn m_planner_record_state(ptr: *mut c_void, state_to_record: *mut CVehicleKinematicState) -> bool;
-
-//     //fn m_planner_get_record_length(m_planner: *const c_void) -> i32;
-
-//     fn m_planner_set_heading_weight(m_planner_ptr: *mut c_void, heading_weight: f64);
-
-//     //fn m_planner_get_heading_weight(m_planner: *const c_void) -> f64;
-
-//     fn m_planner_set_min_record_distance(m_planner_ptr: *mut c_void, min_record_distance: f64);
-
-//     //fn m_planner_get_min_record_distance(m_planner: *const c_void) -> f64;
-
-//     fn m_planner_read_trajectory_buffer_from_file(m_planner_ptr: *mut c_void, replay_path: *const c_char );
-
-//     fn m_planner_plan(m_planner_ptr: *mut c_void, current_state: autoware_auto_msgs::msg::CVehicleKinematicState) -> autoware_auto_msgs::msg::CTrajectory;
-
-//     fn m_planner_reached_goal(m_planner_ptr: *mut c_void, current_state: autoware_auto_msgs::msg::CVehicleKinematicState, distance_thresh: f64, angle_thresh: f64) -> bool;
-// }
-
 
 struct ReplayPlannerOperator{
     pub config: Config,
@@ -409,10 +247,16 @@ impl ReplayPlannerOperator {
     }
 
     fn input_rule(_ctx: ZFContext, inputs: &mut HashMap<String, Token>) -> InputRuleOutput {
-        for token in inputs.values() {
+        for (key, token) in inputs {
             match token {
-                Token::Ready(_) => continue,
-                Token::NotReady => return Ok(false),
+                Token::Ready(_) => {
+                    println!("{} ready", key);
+                    continue
+                },
+                Token::NotReady => {
+                    println!("{} NOT ready", key);
+                    return Ok(false);
+                },
             }
         }
 
@@ -440,12 +284,14 @@ impl ReplayPlannerOperator {
 
                 
                 let mut global_var_write = GLOBAL_VAR.write().unwrap();
-                // global_var_write.set_is_initialized(true);
+                global_var_write.set_is_initialized(true);
                 global_var_write.set_m_planner(m_planner_node);
+                global_var_write.set_m_goal_distance_threshold_m(config.m_goal_distance_threshold_m);
+                global_var_write.set_m_goal_angle_threshold_rad(config.m_goal_angle_threshold_rad);
             }
             println!("init end");
         } else {
-            println!("init ???");
+            println!("already init");
         }
 
         //接收启动信号
@@ -541,13 +387,15 @@ impl ReplayPlannerOperator {
                 nanosec: vehicle_state.header.stamp.nanosec,
             };
             
+            let frame_id = CString::new(vehicle_state.header.frame_id.clone()).expect("CString::new failed");
+
             let c_header = ffi::CHeader{
                 stamp: c_stamp,
-                frame_id: CString::new(vehicle_state.header.frame_id.clone()).expect("CString::new failed").as_ptr(),
+                frame_id: frame_id.as_ptr(),
                 size: vehicle_state.header.frame_id.len() as i32,
             };
 
-            let c_vector = ffi2::CVector3 {
+            let c_vector = ffi::CVector3 {
                 x: vehicle_state.delta.translation.x,
                 y: vehicle_state.delta.translation.y,
                 z: vehicle_state.delta.translation.z,
@@ -592,25 +440,15 @@ impl ReplayPlannerOperator {
                 delta: c_delta,
             };
 
-
-            // let ctime = crate::ffi::CTime::make_unique1(vehicle_state.header.stamp.sec, vehicle_state.header.stamp.nanosec);
-            // let header = crate::ffi::CHeader::make_unique1(ctime, vehicle_state.header.frame_id);
-            // let cduration = crate::ffi::CDuration::make_unique1(vehicle_state.state.time_from_start.sec, vehicle_state.state.time_from_start.nanosec);
-            // let ccomplex32 = crate::ffi::CComplex32::make_unique1(vehicle_state.state.heading.real, vehicle_state.state.heading.imag);
-            // let state = crate::ffi::CTrajectoryPoint::make_unique1(cduration, vehicle_state.state.x, vehicle_state.state.y, 
-            //     ccomplex32, vehicle_state.state.longitudinal_velocity_mps, vehicle_state.state.lateral_velocity_mps, vehicle_state.state.acceleration_mps2, 
-            //     vehicle_state.state.heading_rate_rps, vehicle_state.state.front_wheel_angle_rad, vehicle_state.state.rear_wheel_angle_rad);
-            // let translation = crate::ffi::CVector3::make_unique1(vehicle_state.delta.translation.x, vehicle_state.delta.translation.y, vehicle_state.delta.translation.z);
-            // let rotation = crate::ffi::CQuaternion::make_unique1(vehicle_state.delta.rotation.x, vehicle_state.delta.rotation.y, vehicle_state.delta.rotation.z, vehicle_state.delta.rotation.w);
-            // let delta = crate::ffi::CTransform::make_unique1(translation, rotation);
-            // let c_vehicle_state = crate::ffi::CVehicleKinematicState::make_unique1(header, state, delta);
+            let test = CStr::from_ptr( c_vehicle_state.header.frame_id).to_str().unwrap().to_string();
+            println!("send frame id: {}",test);
 
             if m_planner_node_ptr_pin.m_planner_is_replaying() {
                 println!("Replaying recorded ego postion as trajectory");
             
                 let m_planner_node = GLOBAL_VAR.read().unwrap().m_planner_node_ptr.clone();
                 let m_planner_node_ptr = m_planner_node as  * mut ffi::ReplayPlannerNode;
-                let mut m_planner_node_ptr_pin =  unsafe { std :: pin :: Pin :: new_unchecked ( & mut  * m_planner_node_ptr) };
+                let m_planner_node_ptr_pin =  unsafe { std :: pin :: Pin :: new_unchecked ( & mut  * m_planner_node_ptr) };
 
                 let traj_raw = m_planner_node_ptr_pin.m_planner_plan(c_vehicle_state);
 
@@ -659,73 +497,6 @@ impl ReplayPlannerOperator {
                     trajectory_points.push(trajectory_point);
                 }
 
-               // println!("trajectory number: {}", traj_raw.points.size);
-
-            //    let traj_raw_header = crate::ffi::CTrajectory::get_header(traj_raw.pin_mut());
-            //    let traj_raw_points = crate::ffi::CTrajectory::get_points(traj_raw.pin_mut());
-            //    let trajectory_points = Vec::new();
-               
-
-            //    for index in 0..traj_raw_points.len() {
-            //        let ctrajectory_point = crate::ffi::CTrajectory::get_point(traj_raw.pin_mut(), index as i32);
-            //        let time_from_start_cpp = crate::ffi::CTrajectoryPoint::get_time_from_start(ctrajectory_point.pin_mut());
-            //        let x = crate::ffi::CTrajectoryPoint::get_x(ctrajectory_point.pin_mut());
-            //        let y = crate::ffi::CTrajectoryPoint::get_y(ctrajectory_point.pin_mut());
-            //        let heading = crate::ffi::CTrajectoryPoint::get_heading(ctrajectory_point.pin_mut());
-            //        let longitudinal_velocity_mps = crate::ffi::CTrajectoryPoint::get_longitudinal_velocity_mps(ctrajectory_point.pin_mut());
-            //        let lateral_velocity_mps = crate::ffi::CTrajectoryPoint::get_lateral_velocity_mps(ctrajectory_point.pin_mut());
-            //        let acceleration_mps2 = crate::ffi::CTrajectoryPoint::get_acceleration_mps2(ctrajectory_point.pin_mut());
-            //        let heading_rate_rps = crate::ffi::CTrajectoryPoint::get_heading_rate_rps(ctrajectory_point.pin_mut());
-            //        let front_wheel_angle_rad = crate::ffi::CTrajectoryPoint::get_front_wheel_angle_rad(ctrajectory_point.pin_mut());
-            //        let rear_wheel_angle_rad = crate::ffi::CTrajectoryPoint::get_rear_wheel_angle_rad(ctrajectory_point.pin_mut());
-            //        let heading_real = crate::ffi::CComplex32::get_real(heading.pin_mut());
-            //        let heading_imag = crate::ffi::CComplex32::get_imag(heading.pin_mut());
-                
-
-            //        let sec = crate::ffi::CDuration::get_sec(time_from_start_cpp.pin_mut());
-            //        let nanosec = crate::ffi::CDuration::get_nanosec(time_from_start_cpp.pin_mut());
-
-            //        let heading = autoware_auto_msgs::msg::Complex32 {
-            //             real: heading_real,
-            //             imag: heading_imag,
-            //         };
-
-            //         let time_from_start = builtin_interfaces::msg::Duration {
-            //             sec,
-            //             nanosec,
-            //         };
-
-            //        let trajectory_point_rust = autoware_auto_msgs::msg::TrajectoryPoint {
-            //            time_from_start,
-            //            x,
-            //            y,
-            //            heading,
-            //            longitudinal_velocity_mps,
-            //            lateral_velocity_mps,
-            //            acceleration_mps2,
-            //            heading_rate_rps,
-            //            front_wheel_angle_rad,
-            //            rear_wheel_angle_rad,
-            //        };
-
-            //        trajectory_points.push(trajectory_point_rust);
-            //     }
-
-                // let header_stamp = crate::ffi::CHeader::get_stamp(header.pin_mut());
-                // let stamp_sec = crate::ffi::CTime::get_sec(header_stamp.pin_mut());
-                // let stamp_nanosec = crate::ffi::CTime::get_nanosec(header_stamp.pin_mut());
-
-                // let frame_id_cpp =  crate::ffi::CHeader::get_frame_id(header.pin_mut());
-                // let time = builtin_interfaces::msg::Time {
-                //     sec: stamp_sec,
-                //     nanosec: stamp_nanosec,
-                // };
-
-                // let header_rust = std_msgs::msg::Header {
-                //     stamp: time,
-                //     frame_id: frame_id_cpp.to_string(),
-                // };
-
                 let trajectory = autoware_auto_msgs::msg::Trajectory {
                     header: header_msg,
                     points: trajectory_points,
@@ -744,7 +515,7 @@ impl ReplayPlannerOperator {
 
             let m_planner_node = GLOBAL_VAR.read().unwrap().m_planner_node_ptr.clone();
             let m_planner_node_ptr = m_planner_node as  * mut ffi::ReplayPlannerNode;
-            let mut m_planner_node_ptr_pin =  unsafe { std :: pin :: Pin :: new_unchecked ( & mut  * m_planner_node_ptr) };
+            let m_planner_node_ptr_pin =  unsafe { std :: pin :: Pin :: new_unchecked ( & mut  * m_planner_node_ptr) };
 
 
             let c_stamp= ffi::CTime {
@@ -752,13 +523,15 @@ impl ReplayPlannerOperator {
                 nanosec: vehicle_state.header.stamp.nanosec,
             };
             
+            let frame_id = CString::new(vehicle_state.header.frame_id.clone()).expect("CString::new failed");
+
             let c_header = ffi::CHeader{
                 stamp: c_stamp,
-                frame_id: CString::new(vehicle_state.header.frame_id.clone()).expect("CString::new failed").as_ptr(),
+                frame_id: frame_id.as_ptr(),
                 size: vehicle_state.header.frame_id.len() as i32,
             };
 
-            let c_vector = ffi2::CVector3 {
+            let c_vector = ffi::CVector3 {
                 x: vehicle_state.delta.translation.x,
                 y: vehicle_state.delta.translation.y,
                 z: vehicle_state.delta.translation.z,
@@ -829,20 +602,6 @@ impl ReplayPlannerOperator {
         println!("zenoh-flow operator end");
         Ok(result)
     }
-
-    // fn output_rule(
-    //     _ctx: ZFContext,
-    //     outputs: HashMap<String, Arc<dyn DataTrait>>,
-    // ) -> OutputRuleOutput {
-    //     let mut zf_outputs: HashMap<String, ZFComponentOutput> = HashMap::with_capacity(1);
-
-    //     zf_outputs.insert(
-    //         String::from(LINK_ID_OUTPUT_PLANNED_TRAJECTORY),
-    //         ZFComponentOutput::Data(outputs.get(LINK_ID_OUTPUT_PLANNED_TRAJECTORY).unwrap().clone()),
-    //     );
-
-    //     Ok(zf_outputs)
-    // }
 }
 
 impl OperatorTrait for ReplayPlannerOperator {

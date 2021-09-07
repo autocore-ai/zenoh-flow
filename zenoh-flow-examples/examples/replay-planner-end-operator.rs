@@ -32,7 +32,7 @@ use zenoh_flow::{
 
 use zenoh_flow_examples::{ZFString, ZFUsize, ZFBytes};
 use autoware_auto_msgs::action::{ReplayTrajectoryFeedback};
-use autoware_auto_msgs::msg::{VehicleKinematicState, CVehicleKinematicState, Trajectory, CTrajectory};
+use autoware_auto_msgs::msg::{VehicleKinematicState, Trajectory};
 use uhlc::{Timestamp, NTP64, ID};
 
 static LINK_ID_INPUT_PLANNED_TRAJECTORY: &str = "planned_trajectory";  //规划好的轨迹

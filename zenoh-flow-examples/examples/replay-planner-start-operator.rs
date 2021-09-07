@@ -65,6 +65,7 @@ pub struct ReplayPlannerSourceGlobalVar {
     is_initialized: bool,
     record_vec: Vec<Record>,
     record_index: usize,
+    record_max: usize,
 }
 
 
@@ -74,6 +75,7 @@ impl ReplayPlannerSourceGlobalVar {
             is_initialized: false,
             record_vec: Vec::new(),
             record_index: 0,
+            record_max: 0,
         }
     }
 
@@ -87,10 +89,16 @@ impl ReplayPlannerSourceGlobalVar {
     
     pub fn set_record_vec(&mut self, record_vec: Vec<Record>) {
         self.record_vec = record_vec;
+        let record_vec_borrow = &self.record_vec;
+        self.record_max = record_vec_borrow.len();
     }
     
     pub fn get_record(&self, index: usize) -> &Record {
-        self.record_vec.get(index).unwrap()
+        if index < self.record_max {
+            self.record_vec.get(index).unwrap()
+        } else {
+            self.record_vec.get(self.record_max - 1).unwrap()
+        }
     }
 
     pub fn set_record_index(&mut self, record_index: usize) {
@@ -148,6 +156,7 @@ impl ReplayPlannerStartOperator {
         let is_initialized = GLOBAL_VAR.read().unwrap().get_is_initialized();
 
         if is_initialized == false {
+            println!("is_initialized == false");
             let replay_trajectory_gaol = ReplayTrajectoryGoal {
                 replay_path: "path".to_string(),
             };
@@ -165,6 +174,7 @@ impl ReplayPlannerStartOperator {
                 let record: Record = result.unwrap().deserialize(None).unwrap();
                 vec.push(record);
             }
+            println!("vec length = {}", vec.len());
             let mut global_var_write = GLOBAL_VAR.write().unwrap();
             global_var_write.set_record_vec(vec);
 
@@ -177,8 +187,17 @@ impl ReplayPlannerStartOperator {
             };
 
             results.insert(String::from(LINK_ID_OUTPUT_REPLAY_TRAJECTORY_GOAL), zf_data!(replay_trajectory_goal_data));
+
+            
+             // 构造一个空的消息
+             let vehicle_states_data = ZFBytes {
+                bytes: Vec::<u8>::new()
+            };
+
+            results.insert(String::from(LINK_ID_OUTPUT_VEHICLE_STATE), zf_data!(vehicle_states_data));
         
         } else {
+            println!("is_initialized == true");
             // 已启动，发送车辆当前位置
             let record_index = GLOBAL_VAR.read().unwrap().get_record_index();
             let time = builtin_interfaces::msg::Time {
@@ -209,6 +228,7 @@ impl ReplayPlannerStartOperator {
                 rear_wheel_angle_rad:  GLOBAL_VAR.read().unwrap().get_record(record_index).rear_wheel_angle_rad,
             };
 
+            println!("send record index: {}", record_index);
             let delta = Transform {
                 translation: Vector3 {
                     x: 0.0,
@@ -229,12 +249,21 @@ impl ReplayPlannerStartOperator {
                 delta: delta,
             };
 
-            let vehicle_statey_data = ZFBytes {
+            let vehicle_states_data = ZFBytes {
                 bytes: bincode::serialize(&vehicle_state).unwrap(),
             };
 
-            results.insert(String::from(LINK_ID_OUTPUT_VEHICLE_STATE), zf_data!(vehicle_statey_data));
+            results.insert(String::from(LINK_ID_OUTPUT_VEHICLE_STATE), zf_data!(vehicle_states_data));
             GLOBAL_VAR.write().unwrap().set_record_index(record_index + 1);
+
+
+
+            // 构造一个空的消息
+            let replay_trajectory_goal_data = ZFBytes {
+                bytes: Vec::<u8>::new()
+            };
+
+            results.insert(String::from(LINK_ID_OUTPUT_REPLAY_TRAJECTORY_GOAL), zf_data!(replay_trajectory_goal_data));
         }
         //results.insert(String::from(LINK_ID_OUTPUT_REPLAY_TRAJECTORY_GOAL), zf_data!(ZFUsize(value)));
         println!("zenoh-flow-start operator end");
