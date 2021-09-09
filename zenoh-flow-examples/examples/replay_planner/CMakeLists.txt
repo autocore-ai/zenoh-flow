@@ -27,6 +27,7 @@ include_directories(include)
 ament_auto_find_build_dependencies()
 ament_auto_add_library(${PROJECT_NAME} SHARED
   src/replay_planner_wrapper.cpp
+  src/sub_node.cpp
   src/recordreplay_planner.cpp
   src/msgs/autoware_auto_msgs/convert.cpp
   src/msgs/builtin_interfaces/convert.cpp

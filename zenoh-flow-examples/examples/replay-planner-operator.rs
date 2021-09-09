@@ -204,6 +204,8 @@ autocxx::include_cpp! {
 
     generate_pod!("CHeader")
     generate!("getReplayPlannerNode")
+    //generate!("MinimalSubscriber")
+    //generate!("readTopic")
     generate!("ReplayPlannerNode")
 }
 
@@ -271,6 +273,9 @@ impl ReplayPlannerOperator {
             unsafe {
                 let guard = _ctx.lock();
                 let config = downcast!(Config, guard.state).unwrap();
+
+                // ffi::rclcppInit();
+                // println!("rclcppInit complete");
 
                 let m_planner_node = ffi::getReplayPlannerNode();
                 let m_planner_node_ptr = m_planner_node as  * mut ffi::ReplayPlannerNode;
@@ -494,6 +499,8 @@ impl ReplayPlannerOperator {
                         rear_wheel_angle_rad: trajectory_point_raw.rear_wheel_angle_rad,
                     };
 
+                    println!("trajectory_point_raw.x: {}, trajectory_point_raw.y: {}, ", trajectory_point_raw.x, trajectory_point_raw.y);
+
                     trajectory_points.push(trajectory_point);
                 }
 
@@ -582,7 +589,7 @@ impl ReplayPlannerOperator {
 
                     let m_planner_node = GLOBAL_VAR.read().unwrap().m_planner_node_ptr.clone();
                     let m_planner_node_ptr = m_planner_node as  * mut ffi::ReplayPlannerNode;
-                    let mut m_planner_node_ptr_pin =  unsafe { std :: pin :: Pin :: new_unchecked ( & mut  * m_planner_node_ptr) };
+                    let m_planner_node_ptr_pin =  unsafe { std :: pin :: Pin :: new_unchecked ( & mut  * m_planner_node_ptr) };
                     
                     record_replay_state = RecordReplayState::SUCCESS as i32;
                     remaining_length = 0;
@@ -599,6 +606,20 @@ impl ReplayPlannerOperator {
             bytes: bincode::serialize(&replay_trajectory_feedback).unwrap(),
         };
         result.insert(String::from(LINK_ID_OUTPUT_REPLAY_TRAJECTORY_FEEDBACK), zf_data!(replay_trajectory_feedback_data));
+
+        let m_planner_node = GLOBAL_VAR.read().unwrap().m_planner_node_ptr.clone();
+        
+        // println!("readTopic start");
+        // unsafe {
+        //     ffi::readTopic(m_planner_node);
+        // }
+        // println!("readTopic end");
+
+        let m_planner_node = GLOBAL_VAR.read().unwrap().m_planner_node_ptr.clone();
+        let m_planner_node_ptr = m_planner_node as  * mut ffi::ReplayPlannerNode;
+        let m_planner_node_ptr_pin =  unsafe { std :: pin :: Pin :: new_unchecked ( & mut  * m_planner_node_ptr) };
+        m_planner_node_ptr_pin.read_node();
+        
         println!("zenoh-flow operator end");
         Ok(result)
     }

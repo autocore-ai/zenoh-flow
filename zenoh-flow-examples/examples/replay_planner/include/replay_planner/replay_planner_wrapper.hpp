@@ -5,6 +5,8 @@
 #include "replay_planner/msgs/autoware_auto_msgs/CVehicleKinematicState.hpp"
 #include "replay_planner/recordreplay_planner.hpp"
 
+#include "replay_planner/sub_node.hpp"
+
 #include <string>
 #include <memory>
 #include <cstdint>
@@ -24,11 +26,17 @@ public:
     void m_planner_read_trajectory_buffer_from_file(std::string replay_path);
     CTrajectory m_planner_plan(CVehicleKinematicState current_state);
     bool m_planner_reached_goal(CVehicleKinematicState current_state, double distance_thresh, double angle_thresh);
+
+    void read_node();
+
+    std::shared_ptr<MinimalSubscriber> minimal_subscriber_ptr;
 private:
     std::unique_ptr<RecordReplayPlanner> m_planner_ptr;
     autoware_auto_msgs::msg::Trajectory trajectory;
 };
 
 void* getReplayPlannerNode();
+
+// void start_thread(std::shared_ptr<MinimalSubscriber> minimal_subscriber_ptr);
 
 #endif // REPLAY_PLANNER_WRAPPER

@@ -1,6 +1,6 @@
 #include "replay_planner/msgs/autoware_auto_msgs/convert.hpp"
 #include "replay_planner/replay_planner_wrapper.hpp"
-
+#include "replay_planner/sub_node.hpp"
 #include <iostream>
 #include <memory>
 #include <cstdint>
@@ -56,7 +56,24 @@ bool ReplayPlannerNode::m_planner_reached_goal(CVehicleKinematicState current_st
     return this->m_planner_ptr->reached_goal(msg, distance_thresh, angle_thresh);
 }
 
+void ReplayPlannerNode::read_node(){
+    rclcpp::spin_some(this->minimal_subscriber_ptr);
+}
+
 void* getReplayPlannerNode()
 {
-    return new ReplayPlannerNode();
+    rclcpp::init(0, nullptr);
+    //rclcpp::NodeOptions options;
+    //auto replay_planner_node =  ;
+    auto ptr =  new ReplayPlannerNode();
+    ptr->minimal_subscriber_ptr =  std::make_shared<MinimalSubscriber>();
+    // std::thread * executor_thread = new std::thread(start_thread, minimal_subscriber_ptr);
+    // std::cout << "wdnmd5" << std::endl;
+    // executor_thread->detach();
+    rclcpp::spin_some(ptr->minimal_subscriber_ptr);
+    return ptr;
 }
+
+// void start_thread(std::shared_ptr<MinimalSubscriber> minimal_subscriber_ptr){
+//     rclcpp::spin(minimal_subscriber_ptr);
+// }
