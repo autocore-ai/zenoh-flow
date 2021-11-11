@@ -35,6 +35,20 @@ pub fn zf_data_derive(input: TokenStream) -> TokenStream {
     gen.into()
 }
 
+#[proc_macro_derive(ZFFakeSerialize)]
+pub fn zf_data_serialize_derive(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as DeriveInput);
+    let ident = &ast.ident;
+    let gen = quote! {
+        impl zenoh_flow::ZFData for #ident {
+            fn try_serialize(&self) -> zenoh_flow::ZFResult<Vec<u8>> {
+                todo!()
+            }
+        }
+    };
+    gen.into()
+}
+
 #[proc_macro_derive(ZFState)]
 pub fn zf_state_derive(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
