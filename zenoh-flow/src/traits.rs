@@ -29,18 +29,13 @@ pub trait DowncastAny {
 }
 
 pub trait ZFData: DowncastAny + Debug + Send + Sync {
-    fn try_serialize(&self) -> ZFResult<Vec<u8>> {
-        todo!()
-    }
+    fn try_serialize(&self) -> ZFResult<Vec<u8>>;
 }
 
 pub trait Deserializable {
-    fn try_deserialize(_bytes: &[u8]) -> ZFResult<Self>
+    fn try_deserialize(bytes: &[u8]) -> ZFResult<Self>
     where
-        Self: Sized,
-    {
-        todo!()
-    }
+        Self: Sized;
 }
 
 pub trait ZFState: Debug + Send + Sync {
