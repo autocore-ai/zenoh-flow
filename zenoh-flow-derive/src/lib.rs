@@ -45,6 +45,14 @@ pub fn zf_data_serialize_derive(input: TokenStream) -> TokenStream {
                 todo!()
             }
         }
+        impl zenoh_flow::Deserializable for #ident {
+            fn try_deserialize(_bytes: &[u8]) -> ZFResult<Self>
+            where
+            Self: Sized,
+            {
+                todo!();
+            }
+        }
     };
     gen.into()
 }
