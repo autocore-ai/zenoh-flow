@@ -46,7 +46,9 @@ pub trait ZFState: Debug + Send + Sync {
 pub trait Node {
     fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State>;
 
-    fn finalize(&self, state: &mut State) -> ZFResult<()>;
+    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
+        Ok(())
+    }
 }
 
 pub trait Operator: Node + Send + Sync {
