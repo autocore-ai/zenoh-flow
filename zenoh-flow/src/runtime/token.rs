@@ -12,11 +12,12 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
-use crate::{Data, DataMessage, Message, PortId};
-use async_std::sync::Arc;
+use crate::runtime::deadline::E2EDeadlineMiss;
+use crate::{Data, DataMessage, PortId};
 use std::collections::HashMap;
 use uhlc::Timestamp;
 
+#[derive(Clone)]
 pub struct Tokens {
     pub(crate) map: HashMap<PortId, Token>,
 }
@@ -38,6 +39,16 @@ pub enum TokenAction {
     Consume,
     Drop,
     Keep,
+}
+
+impl std::fmt::Display for TokenAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Consume => write!(f, "Consume"),
+            Self::Keep => write!(f, "Keep"),
+            Self::Drop => write!(f, "Drop"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -85,6 +96,10 @@ impl ReadyToken {
     pub fn get_timestamp(&self) -> &Timestamp {
         &self.data.timestamp
     }
+
+    pub fn get_missed_end_to_end_deadlines(&self) -> &[E2EDeadlineMiss] {
+        &self.data.missed_end_to_end_deadlines
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -94,13 +109,6 @@ pub enum Token {
 }
 
 impl Token {
-    pub fn new_ready(data: DataMessage) -> Self {
-        Self::Ready(ReadyToken {
-            data,
-            action: TokenAction::Consume,
-        })
-    }
-
     pub(crate) fn should_drop(&self) -> bool {
         if let Token::Ready(token_ready) = self {
             if let TokenAction::Drop = token_ready.action {
@@ -112,11 +120,11 @@ impl Token {
     }
 }
 
-impl From<Arc<Message>> for Token {
-    fn from(message: Arc<Message>) -> Self {
-        match message.as_ref() {
-            Message::Control(_) => Token::Pending,
-            Message::Data(data_message) => Token::new_ready(data_message.clone()),
-        }
+impl From<DataMessage> for Token {
+    fn from(data_message: DataMessage) -> Self {
+        Self::Ready(ReadyToken {
+            data: data_message,
+            action: TokenAction::Consume,
+        })
     }
 }

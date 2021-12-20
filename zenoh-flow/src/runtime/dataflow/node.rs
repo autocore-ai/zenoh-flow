@@ -12,22 +12,27 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
+use crate::model::deadline::E2EDeadlineRecord;
 use crate::model::link::PortDescriptor;
 use crate::model::node::{OperatorRecord, SinkRecord, SourceRecord};
-use crate::model::period::PeriodDescriptor;
 use crate::{NodeId, Operator, PortId, PortType, Sink, Source, State, ZFResult};
-use async_std::sync::{Arc, RwLock};
-use libloading::Library;
+use async_std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use std::time::Duration;
+
+#[cfg(target_family = "unix")]
+use libloading::os::unix::Library;
+#[cfg(target_family = "windows")]
+use libloading::Library;
 
 pub struct SourceLoaded {
     pub(crate) id: NodeId,
     pub(crate) output: PortDescriptor,
-    pub(crate) period: Option<PeriodDescriptor>,
-    pub(crate) state: Arc<RwLock<State>>,
+    pub(crate) period: Option<Duration>,
+    pub(crate) state: Arc<Mutex<State>>,
     pub(crate) source: Arc<dyn Source>,
     pub(crate) library: Option<Arc<Library>>,
+    pub(crate) end_to_end_deadlines: Vec<E2EDeadlineRecord>,
 }
 
 impl SourceLoaded {
@@ -41,10 +46,11 @@ impl SourceLoaded {
         Ok(Self {
             id: record.id,
             output: record.output,
-            period: record.period,
-            state: Arc::new(RwLock::new(state)),
+            state: Arc::new(Mutex::new(state)),
+            period: record.period.map(|dur_desc| dur_desc.to_duration()),
             source,
             library: lib,
+            end_to_end_deadlines: vec![],
         })
     }
 }
@@ -53,10 +59,11 @@ pub struct OperatorLoaded {
     pub(crate) id: NodeId,
     pub(crate) inputs: HashMap<PortId, PortType>,
     pub(crate) outputs: HashMap<PortId, PortType>,
-    pub(crate) deadline: Option<Duration>,
-    pub(crate) state: Arc<RwLock<State>>,
+    pub(crate) local_deadline: Option<Duration>,
+    pub(crate) state: Arc<Mutex<State>>,
     pub(crate) operator: Arc<dyn Operator>,
     pub(crate) library: Option<Arc<Library>>,
+    pub(crate) end_to_end_deadlines: Vec<E2EDeadlineRecord>,
 }
 
 impl OperatorLoaded {
@@ -83,10 +90,11 @@ impl OperatorLoaded {
             id: record.id,
             inputs,
             outputs,
-            deadline: record.deadline,
-            state: Arc::new(RwLock::new(state)),
+            local_deadline: record.deadline,
+            state: Arc::new(Mutex::new(state)),
             operator,
             library: lib,
+            end_to_end_deadlines: vec![],
         })
     }
 }
@@ -94,9 +102,10 @@ impl OperatorLoaded {
 pub struct SinkLoaded {
     pub(crate) id: NodeId,
     pub(crate) input: PortDescriptor,
-    pub(crate) state: Arc<RwLock<State>>,
+    pub(crate) state: Arc<Mutex<State>>,
     pub(crate) sink: Arc<dyn Sink>,
     pub(crate) library: Option<Arc<Library>>,
+    pub(crate) end_to_end_deadlines: Vec<E2EDeadlineRecord>,
 }
 
 impl SinkLoaded {
@@ -110,9 +119,10 @@ impl SinkLoaded {
         Ok(Self {
             id: record.id,
             input: record.input,
-            state: Arc::new(RwLock::new(state)),
+            state: Arc::new(Mutex::new(state)),
             sink,
             library: lib,
+            end_to_end_deadlines: vec![],
         })
     }
 }

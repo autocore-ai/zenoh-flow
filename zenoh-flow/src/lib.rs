@@ -12,6 +12,8 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
+use const_format::formatcp;
+
 pub use ::zenoh_flow_derive;
 
 pub use ::async_std;
@@ -22,6 +24,7 @@ pub use ::typetag;
 
 pub mod model;
 pub mod runtime;
+pub use runtime::deadline::LocalDeadlineMiss;
 pub use runtime::message::*;
 pub use runtime::token::*;
 pub mod types;
@@ -34,3 +37,7 @@ pub use macros::*;
 
 pub mod error;
 pub use error::*;
+
+pub const GIT_VERSION: &str = git_version::git_version!(prefix = "v", cargo_prefix = "v");
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const FULL_VERSION: &str = formatcp!("{}-{}", VERSION, GIT_VERSION);

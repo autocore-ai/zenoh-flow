@@ -28,11 +28,9 @@ use std::collections::HashSet;
 use std::fs::read_to_string;
 use structopt::StructOpt;
 use uuid::Uuid;
-use zenoh::*;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::runtime::resources::DataStore;
 use zenoh_flow::runtime::RuntimeClient;
-
 const GIT_VERSION: &str = git_version!(prefix = "v", cargo_prefix = "v");
 
 #[derive(StructOpt, Debug)]
@@ -54,6 +52,40 @@ pub enum AddKind {
 }
 
 #[derive(StructOpt, Debug)]
+pub enum StartKind {
+    Node {
+        instance_id: Uuid,
+        node_id: String,
+    },
+    Replay {
+        instance_id: Uuid,
+        source_id: String,
+        key_expr: String,
+    },
+    Record {
+        instance_id: Uuid,
+        source_id: String,
+    },
+}
+
+#[derive(StructOpt, Debug)]
+pub enum StopKind {
+    Node {
+        instance_id: Uuid,
+        node_id: String,
+    },
+    Replay {
+        instance_id: Uuid,
+        node_id: String,
+        replay_id: String,
+    },
+    Record {
+        instance_id: Uuid,
+        node_id: String,
+    },
+}
+
+#[derive(StructOpt, Debug)]
 pub enum GetKind {
     Flow { id: Option<String> },
     Instance { id: Option<Uuid> },
@@ -71,6 +103,8 @@ pub enum ZFCtl {
     Add(AddKind),
     Get(GetKind),
     Delete(DeleteKind),
+    Start(StartKind),
+    Stop(StopKind),
 }
 
 #[async_std::main]
@@ -81,26 +115,14 @@ async fn main() {
     let args = ZFCtl::from_args();
     log::debug!("Args: {:?}", args);
 
-    let znsession = Arc::new(
-        zenoh::net::open(Properties::from(String::from("mode=peer")).into())
-            .await
-            .unwrap(),
-    );
+    let zsession = Arc::new(zenoh::open(zenoh::config::Config::default()).await.unwrap());
 
-    let servers = RuntimeClient::find_servers(znsession.clone())
-        .await
-        .unwrap();
+    let servers = RuntimeClient::find_servers(zsession.clone()).await.unwrap();
     let entry_point = servers.choose(&mut rand::thread_rng()).unwrap();
     log::debug!("Selected entrypoint runtime: {:?}", entry_point);
-    let client = RuntimeClient::new(znsession, *entry_point);
+    let client = RuntimeClient::new(zsession.clone(), *entry_point);
 
-    let zsession = Arc::new(
-        zenoh::Zenoh::new(Properties::from(String::from("mode=peer")).into())
-            .await
-            .unwrap(),
-    );
-
-    let store = DataStore::new(zsession);
+    let store = DataStore::new(zsession.clone());
 
     match args {
         ZFCtl::Add(ak) => match ak {
@@ -116,8 +138,10 @@ async fn main() {
                     descriptor_path
                 );
                 let yaml_df = read_to_string(descriptor_path).unwrap();
-                let df =
-                    zenoh_flow::model::dataflow::DataFlowDescriptor::from_yaml(&yaml_df).unwrap();
+                let df = zenoh_flow::model::dataflow::descriptor::DataFlowDescriptor::from_yaml(
+                    &yaml_df,
+                )
+                .unwrap();
 
                 let record = client.instantiate(df).await.unwrap().unwrap();
                 log::debug!("Instantiated: {:?}", record);
@@ -258,6 +282,100 @@ async fn main() {
                 let record = client.teardown(id).await.unwrap().unwrap();
                 log::debug!("Deleted: {:?}", record);
                 println!("{}", record.uuid);
+            }
+        },
+        ZFCtl::Start(sk) => match sk {
+            StartKind::Node {
+                instance_id,
+                node_id,
+            } => {
+                let mut table = Table::new();
+                table.add_row(row!["UUID", "Name", "Status",]);
+                client
+                    .start_node(instance_id, node_id.clone())
+                    .await
+                    .unwrap()
+                    .unwrap();
+                table.add_row(row![instance_id, node_id, String::from("Running"),]);
+                table.printstd();
+            }
+            StartKind::Record {
+                instance_id,
+                source_id,
+            } => {
+                let mut table = Table::new();
+                table.add_row(row!["UUID", "Name", "Key Expression",]);
+                let key_expr = client
+                    .start_record(instance_id, source_id.clone().into())
+                    .await
+                    .unwrap()
+                    .unwrap();
+                table.add_row(row![instance_id, source_id, key_expr,]);
+                table.printstd();
+            }
+            StartKind::Replay {
+                instance_id,
+                source_id,
+                key_expr,
+            } => {
+                let mut table = Table::new();
+                table.add_row(row!["UUID", "Name", "Replay Id",]);
+                let replay_id = client
+                    .start_replay(instance_id, source_id.clone().into(), key_expr)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                table.add_row(row![instance_id, source_id, replay_id,]);
+                table.printstd();
+            }
+        },
+        ZFCtl::Stop(sk) => match sk {
+            StopKind::Node {
+                instance_id,
+                node_id,
+            } => {
+                let mut table = Table::new();
+                table.add_row(row!["UUID", "Name", "Status",]);
+                client
+                    .stop_node(instance_id, node_id.clone())
+                    .await
+                    .unwrap()
+                    .unwrap();
+                table.add_row(row![instance_id, node_id, String::from("Stopped"),]);
+                table.printstd();
+            }
+            StopKind::Record {
+                instance_id,
+                node_id,
+            } => {
+                let mut table = Table::new();
+                table.add_row(row!["UUID", "Name", "Key Expression",]);
+                let key_expr = client
+                    .stop_record(instance_id, node_id.clone().into())
+                    .await
+                    .unwrap()
+                    .unwrap();
+                table.add_row(row![instance_id, node_id, key_expr,]);
+                table.printstd();
+            }
+            StopKind::Replay {
+                instance_id,
+                node_id,
+                replay_id,
+            } => {
+                let mut table = Table::new();
+                table.add_row(row!["UUID", "Name", "Replay Id",]);
+                let replay_id = client
+                    .stop_replay(
+                        instance_id,
+                        node_id.clone().into(),
+                        replay_id.clone().into(),
+                    )
+                    .await
+                    .unwrap()
+                    .unwrap();
+                table.add_row(row![instance_id, node_id, replay_id,]);
+                table.printstd();
             }
         },
     }

@@ -17,9 +17,18 @@ use crate::model::node::{OperatorRecord, SinkRecord, SourceRecord};
 use crate::serde::{Deserialize, Serialize};
 use crate::{Configuration, Operator, Sink, Source, ZFError, ZFResult};
 use async_std::sync::Arc;
+
+#[cfg(target_family = "unix")]
+use libloading::os::unix::Library;
+#[cfg(target_family = "windows")]
 use libloading::Library;
+
 use std::path::{Path, PathBuf};
 use url::Url;
+
+#[cfg(target_family = "unix")]
+static LOAD_FLAGS: std::os::raw::c_int =
+    libloading::os::unix::RTLD_NOW | libloading::os::unix::RTLD_LOCAL;
 
 pub static CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub static RUSTC_VERSION: &str = env!("RUSTC_VERSION");
@@ -192,7 +201,12 @@ impl Loader {
     unsafe fn load_lib_operator(path: PathBuf) -> ZFResult<(Library, Arc<dyn Operator>)> {
         log::debug!("Operator Loading {:#?}", path);
 
+        #[cfg(target_family = "unix")]
+        let library = Library::open(Some(path), LOAD_FLAGS)?;
+
+        #[cfg(target_family = "windows")]
         let library = Library::new(path)?;
+
         let decl = library
             .get::<*mut OperatorDeclaration>(b"zfoperator_declaration\0")?
             .read();
@@ -214,7 +228,13 @@ impl Loader {
     /// - be sure to *trust* the code you are loading.
     unsafe fn load_lib_source(path: PathBuf) -> ZFResult<(Library, Arc<dyn Source>)> {
         log::debug!("Source Loading {:#?}", path);
+
+        #[cfg(target_family = "unix")]
+        let library = Library::open(Some(path), LOAD_FLAGS)?;
+
+        #[cfg(target_family = "windows")]
         let library = Library::new(path)?;
+
         let decl = library
             .get::<*mut SourceDeclaration>(b"zfsource_declaration\0")?
             .read();
@@ -236,6 +256,11 @@ impl Loader {
     /// - be sure to *trust* the code you are loading.
     unsafe fn load_lib_sink(path: PathBuf) -> ZFResult<(Library, Arc<dyn Sink>)> {
         log::debug!("Sink Loading {:#?}", path);
+
+        #[cfg(target_family = "unix")]
+        let library = Library::open(Some(path), LOAD_FLAGS)?;
+
+        #[cfg(target_family = "windows")]
         let library = Library::new(path)?;
 
         let decl = library

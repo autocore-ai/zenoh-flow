@@ -13,39 +13,32 @@
 //
 
 #![allow(clippy::manual_async_fn)]
+use std::convert::TryFrom;
 
-use std::sync::Arc;
-
+use crate::model::dataflow::descriptor::{DataFlowDescriptor, Mapping};
 use crate::{
     model::{
-        dataflow::DataFlowRecord,
+        dataflow::record::DataFlowRecord,
         node::{OperatorDescriptor, SinkDescriptor, SourceDescriptor},
     },
     serde::{Deserialize, Serialize},
+    FlowId,
 };
+use async_std::sync::Arc;
 use uuid::Uuid;
 
 use crate::runtime::dataflow::loader::Loader;
-use crate::RuntimeId;
-use crate::{
-    model::dataflow::{DataFlowDescriptor, Mapping},
-    ZFResult,
-};
-
 use crate::runtime::message::ControlMessage;
-
+use crate::{NodeId, RuntimeId, ZFError, ZFResult};
+use uhlc::HLC;
+use zenoh::Session;
 use znrpc_macros::znservice;
 use zrpc::zrpcresult::{ZRPCError, ZRPCResult};
 
-// zrpc required modules
-// use std::convert::TryFrom;
-// use futures::prelude::*;
-// use async_std::prelude::FutureExt;
-use uhlc::HLC;
-use zenoh::net::Session;
-
 use self::dataflow::loader::LoaderConfig;
+
 pub mod dataflow;
+pub mod deadline;
 pub mod message;
 pub mod resources;
 pub mod token;
@@ -57,6 +50,13 @@ pub struct RuntimeContext {
     pub hlc: Arc<HLC>,
     pub runtime_name: RuntimeId,
     pub runtime_uuid: Uuid,
+}
+
+#[derive(Clone)]
+pub struct InstanceContext {
+    pub flow_id: FlowId,
+    pub instance_id: Uuid,
+    pub runtime: RuntimeContext,
 }
 
 pub async fn map_to_infrastructure(
@@ -162,6 +162,27 @@ impl std::fmt::Display for ZenohConfigKind {
     }
 }
 
+impl TryFrom<zenoh::config::whatami::WhatAmI> for ZenohConfigKind {
+    type Error = ZFError;
+    fn try_from(value: zenoh::config::whatami::WhatAmI) -> Result<Self, Self::Error> {
+        match value {
+            zenoh::config::whatami::WhatAmI::Client => Ok(Self::Client),
+            zenoh::config::whatami::WhatAmI::Peer => Ok(Self::Peer),
+            _ => Err(ZFError::MissingConfiguration),
+        }
+    }
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<zenoh::config::whatami::WhatAmI> for ZenohConfigKind {
+    fn into(self) -> zenoh::config::whatami::WhatAmI {
+        match self {
+            Self::Peer => zenoh::config::whatami::WhatAmI::Peer,
+            Self::Client => zenoh::config::whatami::WhatAmI::Client,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZenohConfig {
     pub kind: ZenohConfigKind, // whether the runtime is a peer or a client
@@ -233,6 +254,31 @@ pub trait Runtime {
     /// Stops the given graph node from the given instance.
     /// A graph node can be a source, a sink, a connector, or an operator.
     async fn stop_node(&self, record_id: Uuid, node: String) -> ZFResult<()>;
+
+    /// Start a recording for the given source.
+    async fn start_record(&self, instance_id: Uuid, source_id: NodeId) -> ZFResult<String>;
+
+    /// Stops the recording for the given source.
+    async fn stop_record(&self, instance_id: Uuid, source_id: NodeId) -> ZFResult<String>;
+
+    /// Starts the replay for the given source.
+    /// The replay creates a new node that has the same port and links as the
+    /// source is replaying.
+    async fn start_replay(
+        &self,
+        instance_id: Uuid,
+        source_id: NodeId,
+        key_expr: String,
+    ) -> ZFResult<NodeId>;
+
+    /// Stops the replay for the given source.
+    /// This stops and removes the replay node from the graph.
+    async fn stop_replay(
+        &self,
+        instance_id: Uuid,
+        source_id: NodeId,
+        replay_id: NodeId,
+    ) -> ZFResult<NodeId>;
 
     /// Gets the state of the given graph node for the given instance.
     /// A graph node can be a source, a sink, a connector, or an operator.

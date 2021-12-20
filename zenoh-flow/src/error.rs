@@ -25,6 +25,7 @@ pub enum ZFError {
     MissingState,
     InvalidState,
     Unimplemented,
+    Unsupported,
     Empty,
     MissingConfiguration,
     VersionMismatch,
@@ -51,14 +52,16 @@ pub enum ZFError {
     SenderDoNotHaveOutputs,
     // Validation Error
     DuplicatedNodeId(NodeId),
-    DuplicatedInputPort((NodeId, PortId)),
-    DuplicatedOutputPort((NodeId, PortId)),
+    DuplicatedPort((NodeId, PortId)),
     DuplicatedLink(((NodeId, PortId), (NodeId, PortId))),
-    MultipleOutputsToInput(String),
+    MultipleOutputsToInput((NodeId, PortId)),
     PortTypeNotMatching((PortType, PortType)),
-    OperatorNotFound(NodeId),
+    NodeNotFound(NodeId),
     PortNotFound((NodeId, PortId)),
     PortNotConnected((NodeId, PortId)),
+    NotRecoding,
+    AlreadyRecording,
+    NoPathBetweenNodes(((NodeId, PortId), (NodeId, PortId))),
 }
 
 impl From<ZRPCError> for ZFError {
@@ -106,8 +109,8 @@ impl From<std::io::Error> for ZFError {
     }
 }
 
-impl From<zenoh_util::core::ZError> for ZFError {
-    fn from(err: zenoh_util::core::ZError) -> Self {
+impl From<zenoh_util::core::Error> for ZFError {
+    fn from(err: zenoh_util::core::Error) -> Self {
         Self::ZenohError(format!("{}", err))
     }
 }

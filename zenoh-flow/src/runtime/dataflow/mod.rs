@@ -16,18 +16,22 @@ pub mod instance;
 pub mod loader;
 pub mod node;
 
-use async_std::sync::{Arc, RwLock};
+use async_std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use std::time::Duration;
 use uuid::Uuid;
 
 use crate::model::connector::ZFConnectorRecord;
-use crate::model::dataflow::DataFlowRecord;
-use crate::model::link::{LinkDescriptor, LinkFromDescriptor, LinkToDescriptor, PortDescriptor};
-use crate::model::period::PeriodDescriptor;
+use crate::model::dataflow::record::DataFlowRecord;
+use crate::model::dataflow::validator::DataflowValidator;
+use crate::model::deadline::E2EDeadlineRecord;
+use crate::model::link::{LinkDescriptor, PortDescriptor};
+use crate::model::{InputDescriptor, OutputDescriptor};
 use crate::runtime::dataflow::node::{OperatorLoaded, SinkLoaded, SourceLoaded};
 use crate::runtime::RuntimeContext;
-use crate::{FlowId, NodeId, Operator, PortId, PortType, Sink, Source, State, ZFError, ZFResult};
+use crate::{
+    DurationDescriptor, FlowId, NodeId, Operator, PortId, PortType, Sink, Source, State, ZFResult,
+};
 
 pub struct Dataflow {
     pub(crate) uuid: Uuid,
@@ -38,6 +42,7 @@ pub struct Dataflow {
     pub(crate) sinks: HashMap<NodeId, SinkLoaded>,
     pub(crate) connectors: HashMap<NodeId, ZFConnectorRecord>,
     pub(crate) links: Vec<LinkDescriptor>,
+    validator: DataflowValidator,
 }
 
 impl Dataflow {
@@ -63,6 +68,7 @@ impl Dataflow {
             sinks: HashMap::default(),
             connectors: HashMap::default(),
             links: Vec::default(),
+            validator: DataflowValidator::new(),
         }
     }
 
@@ -107,7 +113,7 @@ impl Dataflow {
             .map(|connector| (connector.id.clone(), connector))
             .collect();
 
-        Ok(Self {
+        let mut dataflow = Self {
             uuid: record.uuid,
             flow_id: record.flow.into(),
             context,
@@ -116,39 +122,56 @@ impl Dataflow {
             sinks,
             connectors,
             links: record.links,
-        })
+            validator: DataflowValidator::new(),
+        };
+
+        if let Some(e2e_deadlines) = record.end_to_end_deadlines {
+            e2e_deadlines
+                .into_iter()
+                .for_each(|deadline| dataflow.add_end_to_end_deadline(deadline))
+        }
+
+        Ok(dataflow)
     }
 
-    pub fn add_static_source(
+    pub fn try_add_static_source(
         &mut self,
         id: NodeId,
-        period: Option<PeriodDescriptor>,
+        period: Option<DurationDescriptor>,
         output: PortDescriptor,
         state: State,
         source: Arc<dyn Source>,
-    ) {
+    ) -> ZFResult<()> {
+        self.validator.try_add_source(id.clone(), output.clone())?;
+
         self.sources.insert(
             id.clone(),
             SourceLoaded {
                 id,
                 output,
-                period,
-                state: Arc::new(RwLock::new(state)),
+                state: Arc::new(Mutex::new(state)),
+                period: period.map(|dur_desc| dur_desc.to_duration()),
                 source,
                 library: None,
+                end_to_end_deadlines: vec![],
             },
         );
+
+        Ok(())
     }
 
-    pub fn add_static_operator(
+    pub fn try_add_static_operator(
         &mut self,
         id: NodeId,
         inputs: Vec<PortDescriptor>,
         outputs: Vec<PortDescriptor>,
-        deadline: Option<Duration>,
+        local_deadline: Option<Duration>,
         state: State,
         operator: Arc<dyn Operator>,
-    ) {
+    ) -> ZFResult<()> {
+        self.validator
+            .try_add_operator(id.clone(), &inputs, &outputs)?;
+
         let inputs: HashMap<PortId, PortType> = inputs
             .into_iter()
             .map(|desc| (desc.port_id, desc.port_type))
@@ -164,31 +187,39 @@ impl Dataflow {
                 id,
                 inputs,
                 outputs,
-                deadline,
-                state: Arc::new(RwLock::new(state)),
+                local_deadline,
+                state: Arc::new(Mutex::new(state)),
                 operator,
                 library: None,
+                end_to_end_deadlines: vec![],
             },
         );
+
+        Ok(())
     }
 
-    pub fn add_static_sink(
+    pub fn try_add_static_sink(
         &mut self,
         id: NodeId,
         input: PortDescriptor,
         state: State,
         sink: Arc<dyn Sink>,
-    ) {
+    ) -> ZFResult<()> {
+        self.validator.try_add_sink(id.clone(), input.clone())?;
+
         self.sinks.insert(
             id.clone(),
             SinkLoaded {
                 id,
                 input,
-                state: Arc::new(RwLock::new(state)),
+                state: Arc::new(Mutex::new(state)),
                 sink,
                 library: None,
+                end_to_end_deadlines: vec![],
             },
         );
+
+        Ok(())
     }
 
     /// Add a link, connecting two nodes.
@@ -198,58 +229,57 @@ impl Dataflow {
     /// This function will return error if the nodes that are to be linked where not previously
     /// added to the Dataflow **or** if the types of the ports (declared in the nodes) are not
     /// identical.
-    pub fn add_link(
+    pub fn try_add_link(
         &mut self,
-        from: LinkFromDescriptor,
-        to: LinkToDescriptor,
+        from: OutputDescriptor,
+        to: InputDescriptor,
         size: Option<usize>,
         queueing_policy: Option<String>,
         priority: Option<usize>,
     ) -> ZFResult<()> {
-        let from_type = self.get_node_port_type(&from.node, &from.output)?;
-        let to_type = self.get_node_port_type(&to.node, &to.input)?;
+        self.validator.try_add_link(&from, &to)?;
 
-        if from_type == to_type {
-            self.links.push(LinkDescriptor {
-                from,
-                to,
-                size,
-                queueing_policy,
-                priority,
-            });
-            return Ok(());
-        }
+        self.links.push(LinkDescriptor {
+            from,
+            to,
+            size,
+            queueing_policy,
+            priority,
+        });
 
-        Err(ZFError::PortTypeNotMatching((from_type, to_type)))
+        Ok(())
     }
 
-    fn get_node_port_type(&self, node_id: &NodeId, port_id: &PortId) -> ZFResult<PortType> {
-        if let Some(operator) = self.operators.get(node_id) {
-            if let Some(port_type) = operator.inputs.get(port_id) {
-                return Ok(port_type.clone());
-            } else if let Some(port_type) = operator.outputs.get(port_id) {
-                return Ok(port_type.clone());
-            } else {
-                return Err(ZFError::PortNotFound((node_id.clone(), port_id.clone())));
-            }
+    pub fn try_add_deadline(
+        &mut self,
+        from: OutputDescriptor,
+        to: InputDescriptor,
+        duration: Duration,
+    ) -> ZFResult<()> {
+        self.validator.validate_deadline(&from, &to)?;
+        let deadline = E2EDeadlineRecord { from, to, duration };
+        self.add_end_to_end_deadline(deadline);
+
+        Ok(())
+    }
+
+    fn add_end_to_end_deadline(&mut self, deadline: E2EDeadlineRecord) {
+        // Look for the "from" node in either Sources and Operators.
+        if let Some(source) = self.sources.get_mut(&deadline.from.node) {
+            source.end_to_end_deadlines.push(deadline.clone());
         }
 
-        if let Some(source) = self.sources.get(node_id) {
-            if source.output.port_id == *port_id {
-                return Ok(source.output.port_type.clone());
-            }
-
-            return Err(ZFError::PortNotFound((node_id.clone(), port_id.clone())));
+        if let Some(operator) = self.operators.get_mut(&deadline.from.node) {
+            operator.end_to_end_deadlines.push(deadline.clone());
         }
 
-        if let Some(sink) = self.sinks.get(node_id) {
-            if sink.input.port_id == *port_id {
-                return Ok(sink.input.port_type.clone());
-            }
-
-            return Err(ZFError::PortNotFound((node_id.clone(), port_id.clone())));
+        // Look for the "to" node in either Operators and Sinks.
+        if let Some(operator) = self.operators.get_mut(&deadline.to.node) {
+            operator.end_to_end_deadlines.push(deadline.clone());
         }
 
-        Err(ZFError::OperatorNotFound(node_id.clone()))
+        if let Some(sink) = self.sinks.get_mut(&deadline.to.node) {
+            sink.end_to_end_deadlines.push(deadline);
+        }
     }
 }

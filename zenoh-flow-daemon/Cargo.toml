@@ -24,7 +24,7 @@ serde_json = "1.0"
 log = "0.4"
 async-std = { version = "=1.9.0", features = ["attributes"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
-uhlc = {version = "0.3" }
+uhlc = "0.4"
 zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master"}
 zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master" }
 zrpc = { git = "https://github.com/atolab/zenoh-rpc.git", branch = "master" }
@@ -35,3 +35,45 @@ machine-uid = "0.2.0"
 git-version = "0.3"
 async-ctrlc ={version = "1.2.0", features = ["stream"]}
 futures = "0.3.5"
+
+
+
+# Debian package configuration
+
+[package.metadata.deb]
+maintainer = "ADLINK Zenoh team <zenoh@adlink-labs.tech>"
+copyright = "2021, ADLINK Technology Inc"
+extended-description = "Eclipse Zenoh Flow Daemon"
+license-file = ["../LICENSE", "0"]
+depends = "$auto, zenohd (=0.6.0~dev.0), zenoh-plugin-storages (=0.6.0~dev.0)"
+section = "utils"
+priority = "optional"
+assets = [
+    # binary
+    ["target/release/zenoh-flow-daemon", "/usr/bin/zenoh-flow-daemon", "755"],
+    # assets
+    ["etc/runtime.yaml", "/etc/zenoh-flow/runtime.yaml", "644"],
+    ["var/*", "/var/zenoh-flow", "644"],
+]
+
+conf-files = ["/etc/zenoh-flow/runtime.yaml"]
+
+[package.metadata.deb.systemd-units]
+unit-scripts = "resources/"
+unit-name = "zenoh-flow.service"
+
+# RPM package configuration
+
+[package.metadata.rpm]
+package = "zenoh-flow-daemon"
+
+[package.metadata.rpm.cargo]
+buildflags = ["--release"]
+
+[package.metadata.rpm.targets]
+zenoh-flow-daemon = { path = "/usr/bin/zenoh-flow-daemon" }
+
+[package.metadata.rpm.files]
+"../etc/runtime.yaml" = { path = "/etc/zenoh-flow/runtime.yaml", mode = "644" }
+"../var/placeholder" = { path = "/var/zenoh-flow/placeholder" }
+"../resources/zenoh-flow.service" = { path = "/lib/systemd/system/zenoh-flow.service" }

@@ -19,12 +19,13 @@ use async_trait::async_trait;
 use flume::{bounded, Receiver};
 use std::collections::HashMap;
 use types::{CounterState, ZFUsize};
-use zenoh_flow::model::link::{LinkFromDescriptor, LinkToDescriptor, PortDescriptor};
+use zenoh_flow::model::link::PortDescriptor;
+use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
 use zenoh_flow::runtime::dataflow::instance::DataflowInstance;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
 use zenoh_flow::{
-    default_output_rule, zf_empty_state, Configuration, Context, Data, DeadlineMiss, Node,
+    default_output_rule, zf_empty_state, Configuration, Context, Data, LocalDeadlineMiss, Node,
     NodeOutput, Operator, PortId, Sink, Source, State, Token, ZFError, ZFResult,
 };
 
@@ -77,7 +78,7 @@ impl Sink for ExampleGenericSink {
         state: &mut State,
         mut input: zenoh_flow::runtime::message::DataMessage,
     ) -> zenoh_flow::ZFResult<()> {
-        let data = input.data.try_get::<ZFUsize>()?;
+        let data = input.get_inner_data().try_get::<ZFUsize>()?;
         let s = state.try_get::<CounterState>()?;
         //
         // The entire test is performed here: we have set DropOdd to drop all values that are Odd.
@@ -140,7 +141,7 @@ impl Operator for DropOdd {
         let mut data_msg = inputs
             .remove(&source)
             .ok_or_else(|| ZFError::InvalidData("No data".to_string()))?;
-        let data = data_msg.data.try_get::<ZFUsize>()?;
+        let data = data_msg.get_inner_data().try_get::<ZFUsize>()?;
 
         assert_eq!(data.0 % 2, 0);
 
@@ -153,7 +154,7 @@ impl Operator for DropOdd {
         _context: &mut zenoh_flow::Context,
         state: &mut State,
         outputs: HashMap<PortId, Data>,
-        deadline_miss: Option<DeadlineMiss>,
+        deadline_miss: Option<LocalDeadlineMiss>,
     ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, NodeOutput>> {
         assert!(
             deadline_miss.is_none(),
@@ -179,8 +180,7 @@ async fn single_runtime() {
 
     let (tx, rx) = bounded::<()>(1); // Channel used to trigger the source
 
-    let session =
-        async_std::sync::Arc::new(zenoh::net::open(zenoh::net::config::peer()).await.unwrap());
+    let session = Arc::new(zenoh::open(zenoh::config::Config::default()).await.unwrap());
     let hlc = async_std::sync::Arc::new(uhlc::HLC::default());
     let rt_uuid = uuid::Uuid::new_v4();
     let ctx = RuntimeContext {
@@ -198,49 +198,55 @@ async fn single_runtime() {
     let sink = Arc::new(ExampleGenericSink {});
     let operator = Arc::new(DropOdd {});
 
-    dataflow.add_static_source(
-        SOURCE.into(),
-        None,
-        PortDescriptor {
-            port_id: SOURCE.into(),
-            port_type: "int".into(),
-        },
-        source.initialize(&None).unwrap(),
-        source,
-    );
-
-    dataflow.add_static_sink(
-        "generic-sink".into(),
-        PortDescriptor {
-            port_id: DESTINATION.into(),
-            port_type: "int".into(),
-        },
-        sink.initialize(&None).unwrap(),
-        sink,
-    );
-
-    dataflow.add_static_operator(
-        "noop".into(),
-        vec![PortDescriptor {
-            port_id: SOURCE.into(),
-            port_type: "int".into(),
-        }],
-        vec![PortDescriptor {
-            port_id: DESTINATION.into(),
-            port_type: "int".into(),
-        }],
-        None,
-        operator.initialize(&None).unwrap(),
-        operator,
-    );
+    dataflow
+        .try_add_static_source(
+            SOURCE.into(),
+            None,
+            PortDescriptor {
+                port_id: SOURCE.into(),
+                port_type: "int".into(),
+            },
+            source.initialize(&None).unwrap(),
+            source,
+        )
+        .unwrap();
 
     dataflow
-        .add_link(
-            LinkFromDescriptor {
+        .try_add_static_sink(
+            "generic-sink".into(),
+            PortDescriptor {
+                port_id: DESTINATION.into(),
+                port_type: "int".into(),
+            },
+            sink.initialize(&None).unwrap(),
+            sink,
+        )
+        .unwrap();
+
+    dataflow
+        .try_add_static_operator(
+            "noop".into(),
+            vec![PortDescriptor {
+                port_id: SOURCE.into(),
+                port_type: "int".into(),
+            }],
+            vec![PortDescriptor {
+                port_id: DESTINATION.into(),
+                port_type: "int".into(),
+            }],
+            None,
+            operator.initialize(&None).unwrap(),
+            operator,
+        )
+        .unwrap();
+
+    dataflow
+        .try_add_link(
+            OutputDescriptor {
                 node: SOURCE.into(),
                 output: SOURCE.into(),
             },
-            LinkToDescriptor {
+            InputDescriptor {
                 node: "noop".into(),
                 input: SOURCE.into(),
             },
@@ -251,12 +257,12 @@ async fn single_runtime() {
         .unwrap();
 
     dataflow
-        .add_link(
-            LinkFromDescriptor {
+        .try_add_link(
+            OutputDescriptor {
                 node: "noop".into(),
                 output: DESTINATION.into(),
             },
-            LinkToDescriptor {
+            InputDescriptor {
                 node: "generic-sink".into(),
                 input: DESTINATION.into(),
             },
@@ -266,14 +272,11 @@ async fn single_runtime() {
         )
         .unwrap();
 
-    let instance = DataflowInstance::try_instantiate(dataflow).unwrap();
+    let mut instance = DataflowInstance::try_instantiate(dataflow).unwrap();
 
-    let mut managers = vec![];
-
-    let runners = instance.get_runners();
-    for runner in &runners {
-        let m = runner.start();
-        managers.push(m)
+    let ids = instance.get_nodes();
+    for id in &ids {
+        instance.start_node(id).await.unwrap();
     }
 
     tx.send_async(()).await.unwrap();
@@ -283,11 +286,17 @@ async fn single_runtime() {
 
     zenoh_flow::async_std::task::sleep(std::time::Duration::from_secs(1)).await;
 
-    for m in managers.iter() {
-        m.kill().await.unwrap()
+    for id in &instance.get_sources() {
+        instance.stop_node(id).await.unwrap()
     }
 
-    futures::future::join_all(managers).await;
+    for id in &instance.get_operators() {
+        instance.stop_node(id).await.unwrap()
+    }
+
+    for id in &instance.get_sinks() {
+        instance.stop_node(id).await.unwrap()
+    }
 }
 
 #[test]
